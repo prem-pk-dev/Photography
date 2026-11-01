@@ -1119,16 +1119,24 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     try {
       const existing = await env.DB.prepare("SELECT id, status FROM projects WHERE slug = ?").bind(slug).first<{ id: string; status: string }>();
       if (existing?.status === "published" && admin.role !== "owner") return json({ error: "forbidden" }, 403);
-      const category = await env.DB.prepare("SELECT slug FROM categories WHERE slug = ?").bind(categorySlug).first<{ slug: string }>();
+      const category = await env.DB.prepare("SELECT id, slug FROM categories WHERE slug = ?").bind(categorySlug).first<{ id: string; slug: string }>();
       if (!category) return json({ error: "invalid_category" }, 400);
       const projectId = crypto.randomUUID();
+      // Older D1 schemas require category_id and cover_object_key even though the
+      // current API also stores category_slug and cover_image_url. Keep both
+      // representations in sync for backward-compatible reads.
+      const coverObjectKey = coverImageUrl.startsWith("/api/media/projects/")
+        ? coverImageUrl.slice("/api/media/".length)
+        : "";
       const project = await env.DB.prepare(
-        "INSERT INTO projects (id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label, updated_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
-        "ON CONFLICT(slug) DO UPDATE SET category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, " +
-        "status = excluded.status, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
+        "INSERT INTO projects (id, slug, category_id, cover_object_key, category_slug, cover_image_url, status, featured, is_featured, location, project_date, demo_label, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
+        "ON CONFLICT(slug) DO UPDATE SET category_id = excluded.category_id, cover_object_key = excluded.cover_object_key, " +
+        "category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, status = excluded.status, " +
+        "featured = excluded.featured, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
         "demo_label = excluded.demo_label, updated_at = datetime('now') RETURNING id"
-      ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
+      ).bind(projectId, slug, category.id, coverObjectKey, categorySlug, coverImageUrl, status,
+        body?.isFeatured === true ? 1 : 0, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
         .first<{ id: string }>();
       if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
       await env.DB.prepare(
