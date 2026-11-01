@@ -606,3 +606,58 @@ test("media replacement rejects unsafe external URLs before database writes", as
   }
   assert.deepEqual(executed, []);
 });
+
+test("owner replacing current cover media updates the cover URL and records the change", async () => {
+  const executed: Array<{ query: string; args: unknown[] }> = [];
+  const db = {
+    prepare(query: string) {
+      let args: unknown[] = [];
+      return {
+        bind(...values: unknown[]) { args = values; return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT m.project_id, m.preview_url, m.is_public, p.cover_image_url FROM project_media")) {
+            return {
+              project_id: "project-id",
+              preview_url: "https://cdn.example.test/old-cover.jpg",
+              is_public: 1,
+              cover_image_url: "https://cdn.example.test/old-cover.jpg",
+            } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push({ query, args });
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/replace", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        id: "cover-media-id",
+        previewUrl: "https://cdn.example.test/new-cover.jpg",
+        altEn: "Updated cover",
+        altHi: "अपडेट किया गया कवर",
+      }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, id: "cover-media-id" });
+  const coverUpdate = executed.find(entry => entry.query.includes("UPDATE projects SET cover_image_url"));
+  assert.ok(coverUpdate, "cover URL update query should execute");
+  assert.equal(coverUpdate.args[0], "https://cdn.example.test/new-cover.jpg");
+  assert.equal(coverUpdate.args[1], "project-id");
+  assert.equal(coverUpdate.args[2], "https://cdn.example.test/old-cover.jpg");
+  assert.ok(executed.some(entry => entry.query.includes("'media_replaced'")));
+});
