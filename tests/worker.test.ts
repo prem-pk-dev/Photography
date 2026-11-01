@@ -61,6 +61,7 @@ test("readiness endpoint accepts the required legacy-compatible schema", async (
     schema: "legacy-compatible",
     adminSetupSecretConfigured: false,
     supabaseStorageConfigured: false,
+    supabaseStorageEnvPresence: { url: false, serviceRoleKey: false, bucket: false },
     mediaStatus: "blocked",
     adminSetupComplete: false,
     adminCount: 0,
