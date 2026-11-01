@@ -9,6 +9,7 @@ const migrationFiles = [
   "0004_site_content_cms.sql",
   "0005_admin_roles.sql",
   "0006_worker_schema_compat.sql",
+  "0100_customer_auth_foundation.sql",
 ];
 
 const migrations = migrationFiles
@@ -24,6 +25,8 @@ const workerContract: Record<string, string[]> = {
   enquiry_rate_limits: ["ip_hash", "window_start", "request_count"],
   admin_users: ["id", "email", "password_hash", "password_salt", "role", "is_active"],
   admin_sessions: ["id", "admin_user_id", "token_hash", "expires_at"],
+  customer_users: ["id", "full_name", "email", "phone", "password_hash", "password_salt", "is_active", "created_at", "updated_at", "last_login_at"],
+  customer_sessions: ["id", "customer_user_id", "token_hash", "expires_at", "created_at", "last_seen_at"],
   admin_setup: ["id", "completed_at"],
   auth_rate_limits: ["rate_key", "window_started_at", "request_count"],
   audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
