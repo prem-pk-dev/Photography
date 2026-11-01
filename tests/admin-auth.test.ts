@@ -303,14 +303,15 @@ test("valid admin credentials create a secure session that the session endpoint 
     body: JSON.stringify({ email: "OWNER@example.test", password }),
   }), { DB: db });
   assert.equal(login.status, 200);
-  assert.deepEqual(await login.json(), { ok: true, admin: { id: "owner-1", email: "owner@example.test", role: "owner" } });
+  const loginBody = await login.text();
+  assert.deepEqual(JSON.parse(loginBody), { ok: true, admin: { id: "owner-1", email: "owner@example.test", role: "owner" } });
   const cookie = login.headers.get("set-cookie") ?? "";
   assert.match(cookie, /^__Host-gf_admin=[A-Za-z0-9_-]+; Path=\/; Max-Age=28800; Secure; HttpOnly; SameSite=Strict$/);
   assert.equal(insertedSession, true);
   assert.equal(updatedLastLogin, true);
   assert.equal(insertedSuccessAudit, true);
   assert.ok(queries.some(query => query.includes("INSERT INTO admin_sessions")));
-  assert.ok(!JSON.stringify(await login.clone().text()).includes(password), "response must not disclose credentials");
+  assert.ok(!loginBody.includes(password), "response must not disclose credentials");
 
   const session = await worker.fetch(new Request("https://example.test/api/admin/session", {
     headers: { cookie: cookie.split(";")[0] },
