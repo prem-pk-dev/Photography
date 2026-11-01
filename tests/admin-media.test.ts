@@ -212,3 +212,44 @@ test("media upload rejects an oversized declared request before reading the body
   assert.equal(response.status, 413);
   assert.deepEqual(await response.json(), { error: "file_too_large" });
 });
+
+test("hiding non-cover media only marks it private and does not require Storage configuration", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT m.preview_url, p.cover_image_url FROM project_media")) {
+            return { preview_url: "/api/media/projects/project-id/media-id.jpg", cover_image_url: "https://example.test/other-cover.jpg" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/hide", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ id: "media-id" }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, id: "media-id", isPublic: false });
+  assert.ok(executed.some((query) => query.includes("UPDATE project_media SET is_public = 0")));
+  assert.ok(executed.some((query) => query.includes("'media_hidden'")));
+  assert.equal(executed.some((query) => query.includes("DELETE")), false);
+});
