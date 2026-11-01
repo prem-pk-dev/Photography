@@ -102,3 +102,25 @@ This corrects the earlier broad description that Production's `categories` and `
 ### CI verification follow-up — 2026-11-01
 
 GitHub Actions run #680 for commit `199fb0b3f10551b64f04ca1c113a7f9d00d53b2a` completed successfully. The `build-and-test` job passed dependency installation, frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture test, fresh-schema contract fixture test, frontend build, Preview health/readiness smoke checks, and unauthenticated admin-route rejection checks. This confirms the branch checks pass; it does **not** replace the missing verified Production export restore. Task 3 remains blocked from final completion until Task 1 produces a durable backup and verified disposable restore for the exact Production schema/data.
+
+
+### Task 4 — Production Cloudflare configuration audit (2026-11-01)
+
+**Status: BLOCKED — read-only audit completed; production configuration is not release-ready.** This audit used the Cloudflare Pages project GET endpoint only; it did not change project settings, secrets, bindings, deployments, or database contents.
+
+Verified project settings:
+- Pages project: `golden-films`; production branch: `main`.
+- Build command: `npm run build`; output directory: `dist`.
+- Production configuration lists `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET=golden-films-media`.
+- Production configuration does not list `SUPABASE_SERVICE_ROLE_KEY` or `ADMIN_SETUP_SECRET`.
+- The production deployment configuration does not list a `DB` D1 binding. Preview has a `DB` binding to the Preview D1 ID; do not treat that as proof of Production binding readiness.
+- The latest deployment remains a Preview deployment from branch `feat/supabase-storage-free-tier`; the canonical Production deployment is still on the older `main` commit.
+
+Remaining acceptance criteria:
+1. Complete Task 3's verified backup restore and forward-migration drill before enabling the Production D1 binding or applying schema changes.
+2. Configure `SUPABASE_SERVICE_ROLE_KEY` and `ADMIN_SETUP_SECRET` using Cloudflare's secret-management UI or an approved secret workflow. Never store their values in Git or logs; verify only presence booleans.
+3. Reconcile Production's D1 schema and the Worker contract, then configure the intended Production `DB` binding under an approved release plan.
+4. Run the live Production readiness, health, and unauthenticated admin-route checks; verify expected status codes without exposing secret values.
+5. Run safe synthetic enquiry/media tests in an isolated environment and re-check CI before release.
+
+No Production configuration changes were made because the missing secrets cannot be safely invented or recovered, and the D1 binding/schema change depends on the incomplete Task 3 backup/restore gate. Task 4 is not marked complete.
