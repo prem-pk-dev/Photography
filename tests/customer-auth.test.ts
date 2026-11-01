@@ -79,7 +79,17 @@ test("customer registration accepts email addresses containing the letter s", as
     { DB: db },
   );
   assert.equal(response.status, 201);
-  assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
+  const cookie = response.headers.get("set-cookie") ?? "";
+  assert.match(cookie, /^__Host-gf_customer=/, "session cookie must use the __Host- prefix");
+  assert.match(cookie, /Path=\//, "session cookie must be scoped to the site root");
+  assert.match(cookie, /Secure/, "session cookie must only be sent over HTTPS");
+  assert.match(cookie, /HttpOnly/, "session cookie must not be readable by browser JavaScript");
+  assert.match(cookie, /SameSite=Lax/, "session cookie must use SameSite protection");
+  assert.match(cookie, /Max-Age=\d+/, "session cookie must have a finite lifetime");
+  const body = await response.json() as { customer: Record<string, unknown> };
+  assert.equal("password_hash" in body.customer, false);
+  assert.equal("password_salt" in body.customer, false);
+  assert.equal("token" in body.customer, false);
 });
 
 test("customer session and profile endpoints reject requests without a valid session", async () => {
