@@ -389,3 +389,47 @@ test("editor can replace private non-cover media without changing project cover"
   assert.ok(executed.some((query) => query.includes("UPDATE projects SET cover_image_url")));
   assert.ok(executed.some((query) => query.includes("'media_replaced'")));
 });
+
+test("editor cannot create public media and no database write occurs", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "editor-id", email: "editor@example.test", role: "editor" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        projectId: "project-id",
+        mediaType: "image",
+        previewUrl: "https://cdn.example.test/public.jpg",
+        altEn: "Public image",
+        altHi: "Public image",
+        sortOrder: 0,
+        isPublic: true,
+      }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "forbidden" });
+  assert.deepEqual(executed, []);
+});
