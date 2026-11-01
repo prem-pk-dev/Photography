@@ -18,6 +18,8 @@ If the dashboard does not offer the Secret type, stop. Never put a sensitive key
 
 ## Current prerequisite status
 
+**Latest confirmed automated verification (2026-11-01):** GitHub Actions run [#485](https://github.com/pkdiv6548/Photography/actions/runs/41268523951) (Golden Films checks) completed with conclusion `success` for commit `5ddb1b001dc6df0400d2700f4e3a7174538f835e`. This run includes the added regression tests that media replace and hide routes reject unauthenticated requests with HTTP 401. Typecheck, Worker API regression tests, forward-migration SQLite fixture, fresh-schema Worker contract fixture, and frontend production build all passed. These are automated/fixture checks only; they do not confirm live Storage operations, live API readiness, or Production schema compatibility.
+
 **Latest confirmed automated verification (2026-10-31):** GitHub Actions run [#416](https://github.com/pkdiv6548/Photography/actions/runs/41199427564) (`Golden Films checks`) completed with conclusion `success` for commit `08048b9ea469e0934fdde02630428333d63b8f01`. Cloudflare Pages Preview deployment for the same commit also reports `success`: https://76c23532.golden-films.pages.dev. The configured CI checks passed, including typecheck, Worker API regression tests, migration/schema fixtures, and frontend production build. This is build/deployment evidence only; it does not confirm live API readiness, browser behavior, real Supabase Storage operations, or Production schema compatibility. The available verification environment's outbound-request policy blocked direct Pages-host probes; that is not a response from the site's API.
 
 **Configuration and read-only D1 schema audit (Cloudflare API, 2026-10-30):**
