@@ -433,3 +433,54 @@ test("editor cannot create public media and no database write occurs", async () 
   assert.deepEqual(await response.json(), { error: "forbidden" });
   assert.deepEqual(executed, []);
 });
+
+test("editor can create private draft media with an audit entry", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "editor-id", email: "editor@example.test", role: "editor" } as T;
+          }
+          if (query.includes("SELECT id FROM projects WHERE id = ?")) {
+            return { id: "project-id" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        projectId: "project-id",
+        mediaType: "image",
+        previewUrl: "https://cdn.example.test/draft.jpg",
+        altEn: "Draft image",
+        altHi: "Draft image",
+        sortOrder: 0,
+        isPublic: false,
+      }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 201);
+  const body = await response.json() as { ok: boolean; id: string; isPublic: boolean };
+  assert.equal(body.ok, true);
+  assert.equal(body.isPublic, false);
+  assert.ok(body.id);
+  assert.ok(executed.some((query) => query.includes("INSERT INTO project_media")));
+  assert.ok(executed.some((query) => query.includes("'media_added_draft'")));
+});
