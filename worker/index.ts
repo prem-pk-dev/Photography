@@ -616,6 +616,7 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
     }
   }
 
+  return null;
 }
 
 async function supportedEnquiryStatuses(db: D1Binding): Promise<string[]> {
