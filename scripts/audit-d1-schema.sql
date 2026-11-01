@@ -12,7 +12,7 @@ WITH expected(table_name, column_name, must_allow_null) AS (
     ["categories","title_en",0],["categories","title_hi",0],["categories","description_en",0],["categories","description_hi",0],
     ["projects","id",0],["projects","slug",0],["projects","category_slug",0],["projects","cover_image_url",0],
     ["projects","status",0],["projects","is_featured",0],["projects","project_date",0],["projects","updated_at",0],
-    ["project_translations","project_id",0],["project_translations","locale",0],["project_translations","title",0],["project_translations","description",0],
+    ["project_translations","project_id",0],["project_translations","language",0],["project_translations","locale",0],["project_translations","title",0],["project_translations","description",0],["project_translations","alt_text",0],
     ["project_media","id",0],["project_media","project_id",0],["project_media","media_type",0],["project_media","preview_url",0],
     ["project_media","original_key",0],["project_media","alt_en",0],["project_media","alt_hi",0],["project_media","sort_order",0],["project_media","is_public",0],
     ["enquiries","id",0],["enquiries","name",0],["enquiries","email",1],["enquiries","phone",0],["enquiries","service",0],
