@@ -714,3 +714,68 @@ test("owner can create public media and writes a public-media audit entry", asyn
   assert.equal(insert.args[insert.args.length - 1], 1);
   assert.ok(executed.some(entry => entry.query.includes("INSERT INTO audit_logs") && entry.args[2] === "media_added_public"), "public media audit action should be bound to the audit insert");
 });
+
+
+test("media upload keeps the quota reservation and returns cleanup-pending when Storage deletion fails", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalConsoleError = console.error;
+  const fetchMethods: string[] = [];
+  const executedRuns: string[] = [];
+  let batchCalls = 0;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    fetchMethods.push(init?.method ?? "GET");
+    if (init?.method === "POST") return new Response("{}", { status: 200 });
+    if (init?.method === "DELETE") return new Response("cleanup failed", { status: 500 });
+    return new Response("unexpected request", { status: 500 });
+  };
+  console.error = () => {};
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT id, status FROM projects")) return { id: "project-id", status: "published" } as T;
+          return null as T | null;
+        },
+        async run() {
+          executedRuns.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+    async batch<T>() {
+      batchCalls += 1;
+      if (batchCalls === 1) return [{ success: true }, { success: true, meta: { changes: 1 } }] as T[];
+      throw new Error("simulated D1 media insert failure");
+    },
+  };
+  try {
+    const form = new FormData();
+    form.set("projectId", "project-id");
+    form.set("file", new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: "image/png" }), "test.png");
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/projects/media/upload", {
+        method: "POST",
+        headers: { cookie: "__Host-gf_admin=valid-test-session" },
+        body: form,
+      }),
+      {
+        DB: db,
+        SUPABASE_URL: "https://storage.example.test",
+        SUPABASE_SERVICE_ROLE_KEY: "test-only-not-a-real-secret",
+        SUPABASE_STORAGE_BUCKET: "test-bucket",
+      },
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "media_upload_cleanup_pending" });
+    assert.deepEqual(fetchMethods, ["POST", "DELETE"]);
+    assert.equal(executedRuns.some((query) => query.includes("UPDATE gf_monthly_media_usage SET used_bytes = MAX")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalConsoleError;
+  }
+});
