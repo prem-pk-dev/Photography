@@ -504,8 +504,10 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
   const path = url.pathname;
   const routes = ["/api/customer/register", "/api/customer/login", "/api/customer/session", "/api/customer/logout", "/api/customer/profile"];
   if (!routes.includes(path)) return null;
-  const methodAllowed = path === "/api/customer/session" || path === "/api/customer/profile"
-    ? ["GET", "PUT"].includes(request.method)
+  const methodAllowed = path === "/api/customer/session"
+    ? request.method === "GET"
+    : path === "/api/customer/profile"
+      ? ["GET", "PUT"].includes(request.method)
     : path === "/api/customer/logout" || path === "/api/customer/login" || path === "/api/customer/register"
       ? request.method === "POST" : false;
   if (!methodAllowed) {
@@ -522,7 +524,7 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
     const email = cleanText(body?.email, 254).toLowerCase();
     const phone = cleanText(body?.phone, 40);
     const password = typeof body?.password === "string" ? body.password : "";
-    if (!fullName || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 12 || password.length > 128) {
+    if (!fullName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 128) {
       return json({ error: "validation_failed", requirements: "Use a name, valid email, and a 12–128 character password." }, 400);
     }
     const id = crypto.randomUUID();
@@ -552,7 +554,7 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
     const body = await readAdminJson(request);
     const email = cleanText(body?.email, 254).toLowerCase();
     const password = typeof body?.password === "string" ? body.password : "";
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !password || password.length > 128) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length > 128) {
       return json({ error: "invalid_credentials" }, 401);
     }
     try {
