@@ -12,9 +12,9 @@ Last checked: 2026-11-01
 - Production branch: `main`
 - Build command: `npm run build`
 - Build output directory: `dist`
-- Latest Preview deployment for branch `feat/supabase-storage-free-tier`: commit `0af0a30e1152853dbc058d68debd164e45d2cdfa`; build and deploy stages succeeded.
+- The latest functional backend code commit is `0af0a30e1152853dbc058d68debd164e45d2cdfa`; its Preview deployment build/deploy stages succeeded. The final audit documentation commit `290c707a251e9a518e4401876096483804b2265e` also deployed successfully to Preview.
 - Latest production deployment still points to the existing `main` commit `de77fe22b606ec64b2c5ba290cf7fde21b218120`; this audit did not deploy to Production.
-- GitHub Actions runs #665 and #666 passed on commit `0af0a30e1152853dbc058d68debd164e45d2cdfa`.
+- GitHub Actions runs #665 and #666 passed on functional backend commit `0af0a30e1152853dbc058d68debd164e45d2cdfa`; runs #669 and #670 passed on the final audit commit `290c707a251e9a518e4401876096483804b2265e`.
 - CI covers typecheck, Worker API tests, migration fixture tests, fresh-schema fixture tests, frontend build, and deployed Preview health/readiness/admin-auth smoke checks.
 
 ### Read-only D1 schema findings (2026-11-01)
