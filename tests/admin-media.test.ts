@@ -74,3 +74,34 @@ test("media hiding requires an authenticated admin", async () => {
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
+
+test("editor cannot hide media because the route is owner-only", async () => {
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "editor-id", email: "editor@example.test", role: "editor" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/hide", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ id: "media-id" }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "forbidden" });
+});
