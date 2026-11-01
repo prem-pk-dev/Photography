@@ -562,3 +562,47 @@ test("public media route rejects malformed object keys before querying Storage",
     globalThis.fetch = originalFetch;
   }
 });
+
+test("media replacement rejects unsafe external URLs before database writes", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  for (const previewUrl of [
+    "http://cdn.example.test/image.jpg",
+    "https://localhost/image.jpg",
+    "https://user:pass@cdn.example.test/image.jpg",
+    "https://192.168.1.10/image.jpg",
+    "https://172.16.0.5/image.jpg",
+  ]) {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/projects/media/replace", {
+        method: "POST",
+        headers: {
+          cookie: "__Host-gf_admin=valid-test-session",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: "media-id", previewUrl }),
+      }),
+      { DB: db },
+    );
+    assert.equal(response.status, 400, previewUrl);
+    assert.deepEqual(await response.json(), { error: "validation_failed" }, previewUrl);
+  }
+  assert.deepEqual(executed, []);
+});
