@@ -23,6 +23,8 @@ CREATE TABLE categories (
   sort_order INTEGER NOT NULL DEFAULT 0,
   title_en TEXT NOT NULL,
   title_hi TEXT NOT NULL,
+  description_en TEXT NOT NULL DEFAULT '',
+  description_hi TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE projects (
