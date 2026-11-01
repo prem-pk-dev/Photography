@@ -79,3 +79,21 @@ The Production D1 export/restore drill and production migration have **not** bee
 - Targeted orphan-reference checks for project/category, media/project, project-media/project, project-translation/project, admin-session/admin-user, customer-session/customer-user, and site-content/admin-user relationships all returned 0 orphan rows.
 - Cloudflare D1's query endpoint rejected `PRAGMA integrity_check` and `PRAGMA foreign_key_check` with `SQLITE_AUTH`; therefore those two native PRAGMA checks are not claimed as passed. Targeted read-only SQL checks passed instead.
 - This validates the checked-in migrations on an empty disposable database. It does **not** validate a forward migration on a restored copy of Production data; that remains a separate backup/restore gate before Production changes.
+
+
+### Focused live Production schema recheck — Task 3 follow-up (2026-11-01)
+
+Read-only Cloudflare D1 API queries were run against Production database `golden-films-db` (ID `0241231b-6e6c-410b-a5ac-958eeb424a78`). All queries succeeded and inspected only `sqlite_master`; no Production DDL/DML was run.
+
+Observed table definitions:
+- `admin_users` has `last_login_at`, but no `role` column.
+- `categories` already has `slug`, `title_en`, `title_hi`, `description_en`, and `description_hi`.
+- `projects` already has `slug`, `category_slug`, `cover_image_url`, `status`, `is_featured`, `project_date`, and `demo_label`; its category relationship references `categories(slug)`.
+- `project_translations` uses `locale` and a primary key on `(project_id, locale)`, but has no `language` or `alt_text` columns.
+- `project_media` exists with Worker-facing media columns; the old `media` table does not exist in Production.
+- `enquiries` has `preferred_date`, but no `consent` column.
+- `site_settings` exists; `site_content`, `site_content_revisions`, and `gf_monthly_media_usage` are absent.
+
+This corrects the earlier broad description that Production's `categories` and `projects` are simply legacy: those tables have several Worker-facing columns already. Production is still **not compatible** with the current readiness contract because the missing role, consent, translation columns, CMS tables, and quota ledger remain unresolved. Do not blindly apply `0006_worker_schema_compat.sql`: it is explicitly a fresh-schema migration and includes `ALTER TABLE` operations that may collide with the existing Production schema (for example, columns already present). A dedicated forward-only migration must be designed and tested against a verified disposable restore of the exact Production export.
+
+**Task 3 result:** fresh-schema migrations and isolated fixture tests pass; Production forward-migration safety review remains blocked by Task 1 (the export has not been downloaded/restored and row-count/schema comparison is incomplete). Production remains untouched.
