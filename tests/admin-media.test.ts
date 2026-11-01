@@ -712,5 +712,5 @@ test("owner can create public media and writes a public-media audit entry", asyn
   const insert = executed.find(entry => entry.query.includes("INSERT INTO project_media"));
   assert.ok(insert);
   assert.equal(insert.args[insert.args.length - 1], 1);
-  assert.ok(executed.some(entry => entry.query.includes("'media_added_public'")));
+  assert.ok(executed.some(entry => entry.query.includes("INSERT INTO audit_logs") && entry.args[2] === "media_added_public"), "public media audit action should be bound to the audit insert");
 });
