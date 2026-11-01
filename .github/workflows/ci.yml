@@ -45,9 +45,9 @@ jobs:
           PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
         run: |
           set -euo pipefail
-          response="$(curl --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --write-out '\\n%{http_code}' "$PREVIEW_BASE_URL/api/ready")"
-          body="$(printf '%s' "$response" | sed '$d')"
-          status="$(printf '%s' "$response" | tail -n 1)"
+          status="$(curl --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --output /tmp/readiness.json --write-out '%{http_code}' "$PREVIEW_BASE_URL/api/ready")"
           echo "Readiness HTTP status: $status"
-          echo "$body" | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; let body; try { body=JSON.parse(s); } catch { console.error("Readiness endpoint did not return JSON:", s); process.exit(1); } console.log("Deployed preview readiness response:", JSON.stringify(body)); if(body.status!=="ready" || body.schema!=="legacy-compatible" || body.supabaseStorageConfigured!==true) process.exit(1);'
+          cat /tmp/readiness.json
+          echo
+          node --input-type=module -e 'import fs from "node:fs"; const body=JSON.parse(fs.readFileSync("/tmp/readiness.json","utf8")); if(body.status!=="ready" || body.schema!=="legacy-compatible" || body.supabaseStorageConfigured!==true || body.blockers?.length!==0) { console.error("Readiness check failed:", JSON.stringify(body)); process.exit(1); } console.log("Deployed preview readiness check passed:", JSON.stringify({status:body.status,schema:body.schema,adminSetupComplete:body.adminSetupComplete,adminCount:body.adminCount,supabaseStorageConfigured:body.supabaseStorageConfigured,blockers:body.blockers}));'
           test "$status" = "200"
