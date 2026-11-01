@@ -374,3 +374,30 @@ test("customer login is rate limited before account lookup", async () => {
   assert.equal(response.headers.get("set-cookie"), null);
   assert.equal(queries.some((query) => query.includes("FROM customer_users")), false);
 });
+
+test("customer registration rate limit returns 429", async () => {
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("auth_rate_limits")) return { request_count: 11 } as T;
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Test Customer", email: "customer@example.com", phone: "", password: "GoldenFilms!2026" }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "temporarily_unavailable" });
+  assert.equal(response.headers.get("set-cookie"), null);
+});
