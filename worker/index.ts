@@ -478,6 +478,140 @@ async function handleAdminAuth(request: Request, env: Env, url: URL): Promise<Re
 }
 
 
+
+const CUSTOMER_SESSION_SECONDS = 30 * 24 * 60 * 60;
+
+function customerCookie(token: string, maxAge: number): string {
+  return "__Host-gf_customer=" + token + "; Path=/; Max-Age=" + maxAge + "; Secure; HttpOnly; SameSite=Lax";
+}
+
+async function currentCustomer(request: Request, env: Env): Promise<{ id: string; full_name: string; email: string; phone: string } | null> {
+  if (!env.DB) return null;
+  const token = cookieValue(request, "__Host-gf_customer");
+  if (!token || token.length > 256) return null;
+  try {
+    return await env.DB.prepare(
+      "SELECT u.id, u.full_name, u.email, u.phone FROM customer_sessions s " +
+      "JOIN customer_users u ON u.id = s.customer_user_id " +
+      "WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.is_active = 1"
+    ).bind(await sha256Hex(token)).first<{ id: string; full_name: string; email: string; phone: string }>();
+  } catch {
+    return null;
+  }
+}
+
+async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise<Response | null> {
+  const path = url.pathname;
+  const routes = ["/api/customer/register", "/api/customer/login", "/api/customer/session", "/api/customer/logout", "/api/customer/profile"];
+  if (!routes.includes(path)) return null;
+  const methodAllowed = path === "/api/customer/session" || path === "/api/customer/profile"
+    ? ["GET", "PUT"].includes(request.method)
+    : path === "/api/customer/logout" || path === "/api/customer/login" || path === "/api/customer/register"
+      ? request.method === "POST" : false;
+  if (!methodAllowed) {
+    const response = json({ error: "method_not_allowed" }, 405);
+    response.headers.set("Allow", path === "/api/customer/session" || path === "/api/customer/profile" ? "GET, PUT" : "POST");
+    return response;
+  }
+  if (!env.DB) return json({ error: "database_not_configured" }, 503);
+
+  if (path === "/api/customer/register") {
+    if (await authRateLimited(request, env, "customer-register")) return json({ error: "temporarily_unavailable" }, 429);
+    const body = await readAdminJson(request);
+    const fullName = cleanText(body?.name, 120);
+    const email = cleanText(body?.email, 254).toLowerCase();
+    const phone = cleanText(body?.phone, 40);
+    const password = typeof body?.password === "string" ? body.password : "";
+    if (!fullName || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 12 || password.length > 128) {
+      return json({ error: "validation_failed", requirements: "Use a name, valid email, and a 12–128 character password." }, 400);
+    }
+    const id = crypto.randomUUID();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    try {
+      const passwordHash = await deriveAdminPassword(password, salt);
+      await env.DB.prepare(
+        "INSERT INTO customer_users (id, full_name, email, phone, password_hash, password_salt) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(id, fullName, email, phone, passwordHash, toBase64Url(salt)).run();
+      const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const expiresAt = new Date(Date.now() + CUSTOMER_SESSION_SECONDS * 1000).toISOString().replace("T", " ").replace("Z", "");
+      await env.DB.prepare(
+        "INSERT INTO customer_sessions (id, customer_user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)"
+      ).bind(crypto.randomUUID(), id, await sha256Hex(token), expiresAt).run();
+      await env.DB.prepare("UPDATE customer_users SET last_login_at = datetime('now') WHERE id = ?").bind(id).run();
+      const response = json({ ok: true, customer: { id, full_name: fullName, email, phone } }, 201);
+      response.headers.append("set-cookie", customerCookie(token, CUSTOMER_SESSION_SECONDS));
+      return response;
+    } catch {
+      // Do not leak SQL details or whether the password hash was derived.
+      return json({ error: "registration_unavailable_or_email_exists" }, 409);
+    }
+  }
+
+  if (path === "/api/customer/login") {
+    if (await authRateLimited(request, env, "customer-login")) return json({ error: "temporarily_unavailable" }, 429);
+    const body = await readAdminJson(request);
+    const email = cleanText(body?.email, 254).toLowerCase();
+    const password = typeof body?.password === "string" ? body.password : "";
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !password || password.length > 128) {
+      return json({ error: "invalid_credentials" }, 401);
+    }
+    try {
+      const customer = await env.DB.prepare(
+        "SELECT id, full_name, email, phone, password_hash, password_salt FROM customer_users WHERE email = ? COLLATE NOCASE AND is_active = 1"
+      ).bind(email).first<{ id: string; full_name: string; email: string; phone: string; password_hash: string; password_salt: string }>();
+      let verified = false;
+      if (customer) {
+        try { verified = constantTimeEqual(await deriveAdminPassword(password, fromBase64Url(customer.password_salt)), customer.password_hash); }
+        catch { verified = false; }
+      } else {
+        await deriveAdminPassword(password, new Uint8Array(16));
+      }
+      if (!customer || !verified) return json({ error: "invalid_credentials" }, 401);
+      const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const expiresAt = new Date(Date.now() + CUSTOMER_SESSION_SECONDS * 1000).toISOString().replace("T", " ").replace("Z", "");
+      await env.DB.prepare(
+        "INSERT INTO customer_sessions (id, customer_user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)"
+      ).bind(crypto.randomUUID(), customer.id, await sha256Hex(token), expiresAt).run();
+      await env.DB.prepare("UPDATE customer_users SET last_login_at = datetime('now') WHERE id = ?").bind(customer.id).run();
+      const response = json({ ok: true, customer: { id: customer.id, full_name: customer.full_name, email: customer.email, phone: customer.phone } });
+      response.headers.append("set-cookie", customerCookie(token, CUSTOMER_SESSION_SECONDS));
+      return response;
+    } catch {
+      return json({ error: "customer_login_unavailable" }, 503);
+    }
+  }
+
+  if (path === "/api/customer/session" || path === "/api/customer/profile") {
+    const customer = await currentCustomer(request, env);
+    if (!customer) return json({ error: "unauthorized" }, 401);
+    if (path === "/api/customer/session" || request.method === "GET") return json({ authenticated: true, customer });
+    const body = await readAdminJson(request);
+    if (!body) return json({ error: "invalid_json" }, 400);
+    const fullName = cleanText(body.name, 120);
+    const phone = cleanText(body.phone, 40);
+    if (!fullName) return json({ error: "validation_failed" }, 400);
+    try {
+      await env.DB.prepare("UPDATE customer_users SET full_name = ?, phone = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(fullName, phone, customer.id).run();
+      return json({ ok: true, customer: { ...customer, full_name: fullName, phone } });
+    } catch {
+      return json({ error: "profile_update_unavailable" }, 503);
+    }
+  }
+
+  const customer = await currentCustomer(request, env);
+  if (!customer) return json({ error: "unauthorized" }, 401);
+  try {
+    const token = cookieValue(request, "__Host-gf_customer");
+    await env.DB.prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+    const response = json({ ok: true });
+    response.headers.append("set-cookie", customerCookie("", 0));
+    return response;
+  } catch {
+    return json({ error: "customer_logout_unavailable" }, 503);
+  }
+}
+
 async function supportedEnquiryStatuses(db: D1Binding): Promise<string[]> {
   const row = await db.prepare(
     "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'enquiries'"
@@ -784,7 +918,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  const adminAuthResponse = await handleAdminAuth(request, env, url);
+  const customerAuthResponse = await handleCustomerAuth(request, env, url);\n  if (customerAuthResponse) return customerAuthResponse;\n\n  const adminAuthResponse = await handleAdminAuth(request, env, url);
   if (adminAuthResponse) return adminAuthResponse;
   const contentResponse = await handleContentApi(request, env, url);
   if (contentResponse) return contentResponse;
