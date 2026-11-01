@@ -338,3 +338,54 @@ test("editor cannot replace public media or the current cover image", async () =
   assert.deepEqual(await response.json(), { error: "forbidden" });
   assert.deepEqual(executed, []);
 });
+
+test("editor can replace private non-cover media without changing project cover", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "editor-id", email: "editor@example.test", role: "editor" } as T;
+          }
+          if (query.includes("SELECT m.project_id, m.preview_url, m.is_public, p.cover_image_url FROM project_media")) {
+            return {
+              project_id: "project-id",
+              preview_url: "https://cdn.example.test/private-old.jpg",
+              is_public: 0,
+              cover_image_url: "https://cdn.example.test/current-cover.jpg",
+            } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/replace", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        id: "private-media-id",
+        previewUrl: "https://cdn.example.test/private-new.jpg",
+        altEn: "Private image",
+        altHi: "Private image",
+      }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, id: "private-media-id" });
+  assert.ok(executed.some((query) => query.includes("UPDATE project_media SET preview_url")));
+  assert.ok(executed.some((query) => query.includes("UPDATE projects SET cover_image_url")));
+  assert.ok(executed.some((query) => query.includes("'media_replaced'")));
+});
