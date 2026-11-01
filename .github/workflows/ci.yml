@@ -32,3 +32,11 @@ jobs:
         run: python3 scripts/test-fresh-schema.py
       - name: Build frontend
         run: npm run build
+
+      - name: Smoke-test deployed preview health endpoint
+        env:
+          PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 "$PREVIEW_BASE_URL/api/health")"
+          echo "$response" | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; const body=JSON.parse(s); if(body.status!=="ok" || body.service!=="golden-films-api") { console.error(body); process.exit(1); } console.log("Deployed preview health check passed:", JSON.stringify(body));'
