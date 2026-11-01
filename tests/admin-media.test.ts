@@ -105,3 +105,40 @@ test("editor cannot hide media because the route is owner-only", async () => {
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "forbidden" });
 });
+
+test("media upload rejects a file whose bytes do not match its declared image MIME type", async () => {
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+        async batch<T>() { return [] as T[]; },
+      };
+    },
+  };
+  const form = new FormData();
+  form.set("projectId", "project-id");
+  form.set("file", new Blob(["not actually a png"], { type: "image/png" }), "fake.png");
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/upload", {
+      method: "POST",
+      headers: { cookie: "__Host-gf_admin=valid-test-session" },
+      body: form,
+    }),
+    {
+      DB: db,
+      SUPABASE_URL: "https://storage.example.test",
+      SUPABASE_SERVICE_ROLE_KEY: "test-only-not-a-real-secret",
+      SUPABASE_STORAGE_BUCKET: "test-bucket",
+    },
+  );
+  assert.equal(response.status, 415);
+  assert.deepEqual(await response.json(), { error: "file_signature_mismatch" });
+});
