@@ -878,9 +878,10 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  if (url.pathname.startsWith("/api/") && !["GET", "POST", "OPTIONS"].includes(request.method)) {
+  const customerProfilePut = url.pathname === "/api/customer/profile" && request.method === "PUT";
+  if (url.pathname.startsWith("/api/") && !["GET", "POST", "OPTIONS"].includes(request.method) && !customerProfilePut) {
     const response = json({ error: "method_not_allowed" }, 405);
-    response.headers.set("Allow", "GET, POST, OPTIONS");
+    response.headers.set("Allow", url.pathname === "/api/customer/profile" ? "GET, PUT, OPTIONS" : "GET, POST, OPTIONS");
     return response;
   }
 
