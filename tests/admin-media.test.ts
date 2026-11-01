@@ -48,3 +48,29 @@ test("media upload rejects an invalid session before checking Supabase Storage c
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
+
+test("media replacement requires an authenticated admin", async () => {
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/replace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "media-id", previewUrl: "https://example.test/image.jpg" }),
+    }),
+    { DB: mockDb() },
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "unauthorized" });
+});
+
+test("media hiding requires an authenticated admin", async () => {
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/hide", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "media-id" }),
+    }),
+    { DB: mockDb() },
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "unauthorized" });
+});
