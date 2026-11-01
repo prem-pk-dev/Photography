@@ -15,6 +15,43 @@ Planning rule: finish tasks in dependency order; every task needs evidence befor
 - **End-to-end verified at plan creation: 0/26.** This is not a claim that no implementation exists: CI tests, source code, a Preview schema inspection, and runbooks already exist. The count means the listed acceptance criteria have not all been proven in the target runtime.
 
 ## Inventory and task-by-task acceptance criteria
+## P0 — 20-part execution breakdown (complete this section before P1)
+
+The 10 original P0 tasks are divided into exactly 20 numbered parts. Work only on these parts until all P0 acceptance gates pass. A source-code check is not a substitute for a live runtime check.
+
+| Part | Parent | Work item | Status | Evidence / blocker |
+|---:|---:|---|---|---|
+| 01 | 1 | Verify CI for the current branch head | **COMPLETE** | Commit `4f7748186faebaebad6ee54e2a7bd1ed7306029c`; GitHub Actions run #530, ID `41284189816`, conclusion `success`. Typecheck, Worker tests, forward-migration fixture, fresh-schema fixture, and frontend build passed. |
+| 02 | 1 | Verify latest Preview deployment points to that same commit | **COMPLETE** | Cloudflare Pages Preview deployment `725806f2-556f-492c-a09e-f00b9b377577`; URL `https://725806f2.golden-films.pages.dev`; deployment status `success`; commit matches Part 01. This does not prove live API readiness. |
+| 03 | 2 | Read-only GET `/api/health` against the confirmed Preview URL | **BLOCKED** | Prior direct endpoint probes were blocked by the verification environment's outbound-request policy. Must capture real HTTP status/body from a permitted browser or terminal; no claim that the site is down. |
+| 04 | 2 | Read-only GET `/api/ready`; record sanitized readiness flags/blockers | **BLOCKED** | Same network restriction. Do not expose secrets or rerun admin setup. |
+| 05 | 3 | Verify Pages Functions catch-all delegates to Worker | **COMPLETE (source-level)** | `functions/api/[[path]].ts` imports `worker/index` and returns `worker.fetch(context.request, context.env)`. Live routing still depends on deployment runtime. |
+| 06 | 3 | Verify API path routing for health/readiness and protected routes in deployed Preview | **BLOCKED** | Requires successful live endpoint responses; do not count static source wiring as runtime route proof. |
+| 07 | 4 | Verify Preview DB binding targets the intended Preview D1 | **COMPLETE (configuration/read-only evidence)** | Cloudflare Preview D1 binding `DB` is `golden-films-preview-test`, ID `21f470cb-776a-4eb2-816e-16605139299a`; no writes made. |
+| 08 | 4 | Verify Supabase settings are active at runtime without changing secrets | **BLOCKED** | Existing hold on `SUPABASE_SERVICE_ROLE_KEY` changes remains in force. Secret values must never be revealed; runtime Storage readiness still needs confirmation. |
+| 09 | 5 | Audit required Worker tables/columns in Preview D1 | **PARTIAL** | Read-only audit found all required columns checked and zero foreign-key violations; `enquiries.email` is nullable. Does not prove all constraints/query paths. |
+| 10 | 5 | Audit every ON CONFLICT target, unique index, nullability/CHECK constraint, and Worker SQL path | **PARTIAL** | Source-level audit coverage exists, but full execution against a verified disposable Production restore is pending. Known concern: Worker uses `project_translations(project_id, locale)` conflict target; must verify actual unique constraint. |
+| 11 | 6 | Confirm Production D1 identity and safe maintenance window | **BLOCKED** | Production must remain unchanged until an appropriate maintenance window is approved. |
+| 12 | 6 | Export Production D1 and verify backup checksum | **BLOCKED** | Depends on Part 11; no export/checksum is claimed complete. |
+| 13 | 7 | Restore verified export into a disposable D1 database | **BLOCKED** | Depends on Parts 11–12; never rehearse against Production. |
+| 14 | 7 | Compare restored schema, indexes, foreign keys, row counts, and relationships | **BLOCKED** | Depends on Part 13; record sanitized evidence. |
+| 15 | 8 | Run candidate forward migration on disposable restored copy | **BLOCKED** | Depends on Parts 13–14; preserve historical data and never fabricate consent. |
+| 16 | 8 | Repeat restore/migration from a clean copy and verify data preservation | **BLOCKED** | Must be reproducible before considering Production changes. |
+| 17 | 9 | Review Production Pages domain, branch, route, and latest deployment | **BLOCKED** | Read-only Production configuration evidence remains incomplete; do not change settings. |
+| 18 | 9 | Review Production D1 binding and environment configuration identities | **BLOCKED** | No secret values should be displayed; current Production compatibility/configuration is unverified. |
+| 19 | 10 | Prepare exact production change, validation, and recovery/rollback plan | **BLOCKED** | Depends on successful Parts 11–18 and schema reconciliation. |
+| 20 | 10 | Record go/no-go approval gate; keep Draft PRs unmerged until authorized | **BLOCKED** | Requires reviewed evidence and explicit approval. No Production migration, secret change, deployment promotion, or PR merge without approval. |
+
+### P0 progress at this checkpoint
+
+- **Total P0 parts:** 20
+- **Completed:** 3 parts (01, 02, 05; Part 05 is source-level only)
+- **Partial:** 2 parts (09, 10)
+- **Blocked:** 15 parts (03, 04, 06–08, 11–20)
+- **Current part:** 03 — live Preview `/api/health` check.
+- **Next part after current:** 04 — live Preview `/api/ready` check.
+- **P1 remains locked** until all 20 P0 parts pass their stated acceptance criteria or are explicitly dispositioned by the owner. A source-level completion must not be reported as a runtime completion.
+
 
 Status labels: **PARTIAL** = code, tests, docs, or read-only evidence exists but acceptance is incomplete; **BLOCKED** = needs external access, an approved maintenance window, a hold to be lifted, or another dependency; **PENDING** = not yet verified or implemented.
 
