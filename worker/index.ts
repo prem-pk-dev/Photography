@@ -1503,6 +1503,127 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
+  if (url.pathname === "/api/admin/projects/media/delete" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    if (admin.role !== "owner") return json({ error: "forbidden" }, 403);
+    const body = await readAdminJson(request);
+    const id = cleanText(body?.id, 80);
+    if (!id || !/^[a-zA-Z0-9_-]{1,80}$/.test(id)) return json({ error: "validation_failed" }, 400);
+
+    try {
+      const current = await env.DB.prepare(
+        "SELECT m.id, m.project_id, m.preview_url, m.original_key, p.cover_image_url " +
+        "FROM project_media m JOIN projects p ON p.id = m.project_id WHERE m.id = ?"
+      ).bind(id).first<{ id: string; project_id: string; preview_url: string; original_key: string | null; cover_image_url: string | null }>();
+
+      if (current && current.preview_url === current.cover_image_url) {
+        return json({ error: "replace_cover_before_deleting" }, 409);
+      }
+
+      // An existing incomplete job is the recovery path for duplicate requests,
+      // including the case where Storage deletion succeeded but the final D1 batch failed.
+      let job = await env.DB.prepare(
+        "SELECT id, media_id, project_id, storage_key, status FROM gf_media_cleanup_jobs " +
+        "WHERE media_id = ? AND status IN ('pending', 'failed') ORDER BY created_at DESC LIMIT 1"
+      ).bind(id).first<{ id: string; media_id: string; project_id: string; storage_key: string; status: string }>();
+
+      if (!current && !job) return json({ error: "media_not_found" }, 404);
+
+      if (current && !job && !current.original_key) {
+        // External media has no object owned by this Storage bucket: database-only delete.
+        const result = await env.DB.batch([
+          env.DB.prepare("DELETE FROM project_media WHERE id = ? AND project_id = ? AND original_key IS NULL")
+            .bind(id, current.project_id),
+          env.DB.prepare(
+            "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
+            "SELECT ?, ?, 'media_deleted_external', 'media', ? WHERE NOT EXISTS (SELECT 1 FROM project_media WHERE id = ?)"
+          ).bind(crypto.randomUUID(), admin.id, id, id),
+        ]);
+        if ((result[0]?.meta?.changes ?? 0) !== 1) return json({ error: "media_delete_conflict" }, 409);
+        return json({ ok: true, id, storageDeleted: false });
+      }
+
+      if (current && !job) {
+        const key = current.original_key;
+        // Never let a database value become an arbitrary Storage path.
+        if (!key || key.length > 500 || !key.startsWith("projects/" + current.project_id + "/") ||
+            key.includes("..") || key.includes("\\") || /[?#\u0000-\u001f]/.test(key) || key.includes("://")) {
+          return json({ error: "invalid_storage_key" }, 409);
+        }
+        const jobId = crypto.randomUUID();
+        await env.DB.batch([
+          env.DB.prepare(
+            "INSERT INTO gf_media_cleanup_jobs (id, media_id, project_id, storage_key, status) " +
+            "SELECT ?, m.id, m.project_id, m.original_key, 'pending' FROM project_media m " +
+            "JOIN projects p ON p.id = m.project_id WHERE m.id = ? AND m.project_id = ? " +
+            "AND m.original_key = ? AND m.preview_url <> p.cover_image_url"
+          ).bind(jobId, id, current.project_id, key),
+          env.DB.prepare("UPDATE project_media SET is_public = 0 WHERE id = ? AND project_id = ? AND original_key = ?")
+            .bind(id, current.project_id, key),
+          env.DB.prepare(
+            "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
+            "SELECT ?, ?, 'media_delete_started', 'media', ? WHERE EXISTS " +
+            "(SELECT 1 FROM gf_media_cleanup_jobs WHERE id = ?)"
+          ).bind(crypto.randomUUID(), admin.id, id, jobId),
+        ]);
+        job = await env.DB.prepare(
+          "SELECT id, media_id, project_id, storage_key, status FROM gf_media_cleanup_jobs WHERE id = ?"
+        ).bind(jobId).first<{ id: string; media_id: string; project_id: string; storage_key: string; status: string }>();
+        if (!job) return json({ error: "media_delete_conflict" }, 409);
+      }
+
+      if (!job) return json({ error: "media_delete_unavailable" }, 503);
+      const key = job.storage_key;
+      if (!key || key.length > 500 || !key.startsWith("projects/" + job.project_id + "/") ||
+          key.includes("..") || key.includes("\\") || /[?#\u0000-\u001f]/.test(key) || key.includes("://")) {
+        return json({ error: "invalid_storage_key" }, 409);
+      }
+
+      try {
+        await deleteMediaObject(env, key);
+      } catch (error) {
+        const errorCode = error instanceof Error && /^supabase_storage_delete_failed_\d+$/.test(error.message)
+          ? error.message.slice(0, 80) : "storage_delete_failed";
+        await env.DB.prepare(
+          "UPDATE gf_media_cleanup_jobs SET status = 'failed', attempt_count = attempt_count + 1, " +
+          "last_error_code = ?, updated_at = datetime('now') WHERE id = ? AND status IN ('pending', 'failed')"
+        ).bind(errorCode, job.id).run().catch(() => undefined);
+        console.error("[media-delete] Storage cleanup pending", JSON.stringify({
+          jobId: job.id, errorCode,
+        }));
+        return json({ error: "media_delete_cleanup_pending", retryable: true }, 503);
+      }
+
+      try {
+        await env.DB.batch([
+          env.DB.prepare(
+            "DELETE FROM project_media WHERE id = ? AND project_id = ? AND original_key = ? " +
+            "AND NOT EXISTS (SELECT 1 FROM projects WHERE id = ? AND cover_image_url = project_media.preview_url)"
+          ).bind(job.media_id, job.project_id, key, job.project_id),
+          env.DB.prepare(
+            "UPDATE gf_media_cleanup_jobs SET status = 'complete', attempt_count = attempt_count + 1, " +
+            "last_error_code = NULL, updated_at = datetime('now'), completed_at = datetime('now') WHERE id = ?"
+          ).bind(job.id),
+          env.DB.prepare(
+            "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, 'media_deleted', 'media', ?)"
+          ).bind(crypto.randomUUID(), admin.id, job.media_id),
+        ]);
+      } catch (error) {
+        // Storage is already gone. Leave the durable job incomplete so a repeated
+        // request can safely repeat the idempotent Storage removal and finish D1 cleanup.
+        console.error("[media-delete] Final D1 cleanup pending", JSON.stringify({
+          jobId: job.id, errorName: error instanceof Error ? error.name : "UnknownError",
+        }));
+        return json({ error: "media_delete_cleanup_pending", retryable: true }, 503);
+      }
+      return json({ ok: true, id: job.media_id, storageDeleted: true });
+    } catch {
+      return json({ error: "media_delete_unavailable" }, 503);
+    }
+  }
+
   if (url.pathname === "/api/admin/projects/media/hide" && request.method === "POST") {
     if (!env.DB) return json({ error: "database_not_configured" }, 503);
     const admin = await currentAdmin(request, env);
