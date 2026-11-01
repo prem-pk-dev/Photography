@@ -260,3 +260,27 @@ test("customer login uses generic credentials error for unknown accounts", async
   assert.equal(response.headers.get("set-cookie"), null);
   assert.equal(writes.some((query) => query.includes("INSERT INTO customer_sessions")), false);
 });
+
+test("customer session rejects an invalid session cookie", async () => {
+  const db = {
+    prepare(_query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/session", {
+      method: "GET",
+      headers: { cookie: "__Host-gf_customer=invalid-session-token" },
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "unauthorized" });
+});
