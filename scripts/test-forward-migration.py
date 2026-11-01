@@ -347,6 +347,42 @@ class ForwardMigrationFixtureTest(unittest.TestCase):
             self.db.execute("SELECT COUNT(*) FROM project_translations WHERE project_id='project-1'").fetchone()[0],
             2,
         )
+
+        # The live Worker writes both language and locale, and its upsert uses
+        # (project_id, locale). Verify the migrated schema supports that exact SQL.
+        translation_columns = {
+            row["name"] for row in self.db.execute("PRAGMA table_info(project_translations)")
+        }
+        self.assertTrue(
+            {"project_id", "language", "locale", "title", "description", "alt_text"}.issubset(translation_columns),
+            "translated project schema must expose all columns used by the Worker",
+        )
+        self.assertEqual(
+            [
+                tuple(row)
+                for row in self.db.execute(
+                    "SELECT language, locale, title, alt_text FROM project_translations "
+                    "WHERE project_id='project-1' ORDER BY locale"
+                )
+            ],
+            [("en", "en", "Sample", ""), ("hi", "hi", "नमूना", "")],
+            "legacy translations must map locale into language without losing titles",
+        )
+        self.db.execute(
+            "INSERT INTO project_translations (project_id, language, locale, title, description) "
+            "VALUES (?, 'en', 'en', ?, ?) "
+            "ON CONFLICT(project_id, locale) DO UPDATE SET "
+            "title = excluded.title, description = excluded.description",
+            ("project-1", "Updated sample", "Updated description"),
+        )
+        self.assertEqual(
+            tuple(self.db.execute(
+                "SELECT title, description FROM project_translations "
+                "WHERE project_id='project-1' AND locale='en'"
+            ).fetchone()),
+            ("Updated sample", "Updated description"),
+            "Worker translation upsert must execute and update the existing locale row",
+        )
         self.assertEqual(
             self.db.execute("SELECT category_slug FROM projects WHERE id='project-1'").fetchone()[0],
             "wedding",
