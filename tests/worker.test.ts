@@ -26,6 +26,8 @@ test("readiness endpoint accepts the required legacy-compatible schema", async (
     enquiries: ["id", "name", "email", "phone", "service", "preferred_date", "budget_range", "message", "consent", "status", "created_at", "updated_at"],
     enquiry_rate_limits: ["ip_hash", "window_start", "request_count"],
     admin_users: ["id", "email", "password_hash", "password_salt", "role", "is_active", "last_login_at"],
+    customer_users: ["id", "full_name", "email", "phone", "password_hash", "password_salt", "is_active", "created_at", "updated_at", "last_login_at"],
+    customer_sessions: ["id", "customer_user_id", "token_hash", "expires_at", "created_at", "last_seen_at"],
     admin_sessions: ["id", "admin_user_id", "token_hash", "expires_at"],
     admin_setup: ["id", "completed_at"],
     auth_rate_limits: ["rate_key", "window_started_at", "request_count"],
