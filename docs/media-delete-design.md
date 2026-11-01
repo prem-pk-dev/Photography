@@ -1,6 +1,6 @@
 # Golden Films media deletion — implementation design
 
-Status: design only; no delete route or database migration is implemented by this document.
+Status: delete route is still design-only. Additive cleanup-ledger migration `migrations/0101_gf_media_cleanup_jobs.sql` has been drafted on the feature branch; it has NOT been applied to Preview or Production.
 
 ## Goals
 
@@ -54,7 +54,7 @@ Do not add a schema change to Production until backup/restore gates pass. The le
 ## Release gates
 
 - [ ] Confirm Supabase Storage exact-object delete contract and status codes from current official docs.
-- [ ] Add migration and test fixture only on an isolated test database.
+- [x] Draft additive cleanup-ledger migration `migrations/0101_gf_media_cleanup_jobs.sql` on the feature branch (not applied anywhere).\n- [ ] Execute migration and preservation checks on an isolated test database only.
 - [ ] Implement cleanup ledger plus retry/reconciliation.
 - [ ] Add injected Storage and D1 failure tests.
 - [ ] CI passes on the feature branch.
