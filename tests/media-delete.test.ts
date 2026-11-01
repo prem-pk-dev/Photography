@@ -22,6 +22,7 @@ function makeDb(options: { role?: "owner" | "editor"; cover?: boolean; external?
     audit: [] as string[],
     statements: [] as string[],
     failFinalBatch: false,
+    batchCalls: 0,
   };
   const db = {
     prepare(query: string) {
@@ -69,11 +70,12 @@ function makeDb(options: { role?: "owner" | "editor"; cover?: boolean; external?
       return stmt;
     },
     async batch(statements: Array<{ bind?: (...args: unknown[]) => unknown; [key: string]: unknown }>) {
-      if (state.failFinalBatch && statements.some((s) => String((s as { query?: string }).query ?? "").includes("DELETE FROM project_media"))) {
+      state.batchCalls++;
+      // Uploaded-media deletion first creates/hides the cleanup job, then finalizes deletion.
+      // External-media deletion has a single database-only batch.
+      if (state.failFinalBatch && state.batchCalls >= 2 && !state.external) {
         throw new Error("injected final D1 failure");
       }
-      // D1Statement mocks don't expose query; capture behavior from the ordered batch length
-      // and the route's job state to emulate the two transaction phases.
       if (state.external && !state.job) {
         state.mediaExists = false;
       } else if (!state.job) {
@@ -190,5 +192,34 @@ test("external media deletes its database row without calling Supabase Storage",
     assert.deepEqual(await response.json(), { ok: true, id: MEDIA_ID, storageDeleted: false });
     assert.equal(calls, 0);
     assert.equal(state.statements.some((q) => q.includes("gf_monthly_media_usage")), false);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("final D1 failure returns retryable status and a repeated request completes cleanup", async () => {
+  const { db, state } = makeDb();
+  const originalFetch = globalThis.fetch;
+  let storageCalls = 0;
+  globalThis.fetch = async () => {
+    storageCalls++;
+    return new Response(null, { status: 200 });
+  };
+  try {
+    state.failFinalBatch = true;
+    const first = await worker.fetch(request(), { DB: db, ...ENV_STORAGE } as never);
+    assert.equal(first.status, 503);
+    assert.deepEqual(await first.json(), { error: "media_delete_cleanup_pending", retryable: true });
+    assert.equal(state.mediaExists, true);
+    assert.equal(state.job?.status, "pending");
+    assert.equal(storageCalls, 1);
+
+    state.failFinalBatch = false;
+    const retry = await worker.fetch(request(), { DB: db, ...ENV_STORAGE } as never);
+    assert.equal(retry.status, 200);
+    assert.deepEqual(await retry.json(), { ok: true, id: MEDIA_ID, storageDeleted: true });
+    assert.equal(storageCalls, 2);
+    assert.equal(state.mediaExists, false);
+    assert.equal(state.job?.status, "complete");
+    assert.ok(state.audit.includes("media_deleted"));
   } finally { globalThis.fetch = originalFetch; }
 });
