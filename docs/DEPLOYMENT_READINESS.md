@@ -65,3 +65,17 @@ The Production D1 export/restore drill and production migration have **not** bee
 - Do not infer object-storage keys or delete/recreate existing records during schema reconciliation.
 - Keep the workflow within the existing ₹0 budget; use free-tier resources only.
 - Never commit API tokens, database credentials, or secrets to the repository.
+
+
+### Disposable migration test — Task 3 (2026-11-01)
+
+**Status: migration execution and targeted integrity checks passed on an isolated D1 test database.** No Production D1 writes were performed.
+
+- Created isolated D1 database `golden-films-migration-test-20261101` (ID `da916979-7e0a-4200-99ad-76be0d00071c`).
+- Applied the eight checked-in migrations from branch `feat/supabase-storage-free-tier`: `0001_initial_schema.sql`, `0002_enquiry_rate_limits.sql`, `0003_admin_auth_foundation.sql`, `0004_site_content_cms.sql`, `0005_admin_roles.sql`, `0006_worker_schema_compat.sql`, `0099_gf_monthly_media_usage.sql`, and `0100_customer_auth_foundation.sql`. Each API call returned success.
+- Verified expected tables including `admin_users`, `admin_sessions`, `customer_users`, `customer_sessions`, `site_content`, `site_content_revisions`, `project_media`, and `gf_monthly_media_usage`; verified Worker compatibility columns in `categories`, `projects`, `project_translations`, and `enquiries`.
+- Seed checks: 14 categories and 28 category translations; one `admin_setup` row. Project and enquiry tables are empty in this clean test database, as expected.
+- Re-ran migrations that use `IF NOT EXISTS` / `INSERT OR IGNORE` (`0001`, `0002`, `0003`, `0004`, `0099`, `0100`); all succeeded without duplicate seed rows. Migrations `0005` and `0006` are intentionally fresh-schema / one-time ALTER migrations and are not treated as rerunnable.
+- Targeted orphan-reference checks for project/category, media/project, project-media/project, project-translation/project, admin-session/admin-user, customer-session/customer-user, and site-content/admin-user relationships all returned 0 orphan rows.
+- Cloudflare D1's query endpoint rejected `PRAGMA integrity_check` and `PRAGMA foreign_key_check` with `SQLITE_AUTH`; therefore those two native PRAGMA checks are not claimed as passed. Targeted read-only SQL checks passed instead.
+- This validates the checked-in migrations on an empty disposable database. It does **not** validate a forward migration on a restored copy of Production data; that remains a separate backup/restore gate before Production changes.
