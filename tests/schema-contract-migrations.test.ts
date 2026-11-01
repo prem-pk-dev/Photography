@@ -75,3 +75,23 @@ test("compatibility migration preserves key relationship and least-privilege gua
   assert.match(migrations, /role\s+TEXT\s+NOT\s+NULL\s+DEFAULT\s+['"]editor['"]/i);
   assert.doesNotMatch(migrations, /UPDATE\s+enquiries\s+SET\s+consent\s*=\s*1\b/i);
 });
+
+
+const liveForwardMigration = readFileSync(
+  new URL("../docs/forward-migrations/2026-10-29-live-schema-forward.sql", import.meta.url),
+  "utf8",
+);
+
+test("live forward migration preserves translations and supports Worker language/locale upserts", () => {
+  assert.match(liveForwardMigration, /CREATE\s+TABLE\s+project_translations_new/i);
+  assert.match(
+    liveForwardMigration,
+    /INSERT\s+INTO\s+project_translations_new\s*\(project_id,\s*language,\s*title,\s*description,\s*alt_text,\s*locale\)\s*SELECT\s+project_id,\s*locale,\s*title,\s*description,\s*'',\s*locale\s+FROM\s+project_translations/is,
+  );
+  assert.match(
+    liveForwardMigration,
+    /CREATE\s+UNIQUE\s+INDEX\s+idx_project_translations_project_locale\s+ON\s+project_translations\s*\(project_id,\s*locale\)/i,
+  );
+  assert.match(liveForwardMigration, /DROP\s+TABLE\s+project_translations/i);
+  assert.match(liveForwardMigration, /ALTER\s+TABLE\s+project_translations_new\s+RENAME\s+TO\s+project_translations/i);
+});
