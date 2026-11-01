@@ -253,3 +253,39 @@ test("hiding non-cover media only marks it private and does not require Storage 
   assert.ok(executed.some((query) => query.includes("'media_hidden'")));
   assert.equal(executed.some((query) => query.includes("DELETE")), false);
 });
+
+test("owner cannot hide an unknown media id and no update or audit is written", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/hide", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ id: "unknown-media-id" }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "media_not_found" });
+  assert.deepEqual(executed, []);
+});
