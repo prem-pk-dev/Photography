@@ -28,6 +28,8 @@ jobs:
         run: npm test
       - name: Run forward-migration SQLite fixture test
         run: python3 scripts/test-forward-migration.py
+      - name: Run media cleanup ledger SQLite fixture test
+        run: python3 scripts/test-media-cleanup-ledger.py
       - name: Run fresh-schema Worker contract fixture test
         run: python3 scripts/test-fresh-schema.py
       - name: Build frontend
