@@ -3,7 +3,7 @@
 Review date: 2026-10-31
 Branch: `feat/supabase-storage-free-tier`
 
-Status: **read-only configuration check completed; Production is blocked pending operator verification/configuration; live API remains unverified**.
+Status: **Preview secret configuration reported completed by site owner on 2026-11-01; runtime Storage verification remains pending. Production is still blocked pending separate operator verification/configuration; live API remains unverified**.
 
 This document is an operator checklist, not authorization to change Production. Never paste secrets into issues, pull requests, source files, logs, or chat.
 
@@ -15,7 +15,7 @@ This document is an operator checklist, not authorization to change Production. 
 | D1 binding `DB` | Bind only the designated preview/test database | Must point to the approved production D1 ID | Inspect binding name and database ID in dashboard; do not run writes |
 | `SUPABASE_URL` | Set the project URL for the test project | Set the approved Supabase project URL | Confirm URL/project identity; never log auth headers |
 | `SUPABASE_STORAGE_BUCKET` | `golden-films-media` or approved test bucket | Confirm intended private bucket exists | Check bucket privacy and exact name |
-| `SUPABASE_SERVICE_ROLE_KEY` | Not present in the latest Pages project variable-name listing; configure securely before upload integration tests | Not present in the latest Pages project variable-name listing; configure securely before production upload | Check only presence via dashboard; never print or expose value |
+| `SUPABASE_SERVICE_ROLE_KEY` | Site owner reports Preview secret configuration completed on 2026-11-01; verify by sanitized runtime readiness and controlled test upload | Production configuration not confirmed; configure/verify separately before production upload | Check only presence via dashboard; never print or expose value |
 | `ADMIN_SETUP_SECRET` | Variable name is present in the latest Pages project listing; verify its secret value is set and valid before initial admin setup | Not present in the latest Pages project variable-name listing; configure securely before production admin setup | Check only presence; use a strong unique secret stored in secret manager |
 | Admin owner account | Use test-only account | Create only after schema and secret gates pass | Verify role and login using an authorized private session |
 
@@ -23,8 +23,9 @@ This document is an operator checklist, not authorization to change Production. 
 
 - [ ] Confirm Pages project and preview deployment commit.
 - [ ] Confirm `DB` points to the intended disposable/test database, not Production.
-- [ ] Configure `SUPABASE_URL`, bucket name, and service-role key in Preview environment settings.
-- [ ] Configure `ADMIN_SETUP_SECRET` in Preview environment settings.
+- [x] Site owner reports Preview Supabase secret configuration completed on 2026-11-01 (secret values intentionally not recorded here).
+- [ ] Verify `SUPABASE_URL`, bucket identity/privacy, and service-role key by sanitized runtime readiness and controlled test upload.
+- [ ] Verify `ADMIN_SETUP_SECRET` only if a setup operation is required; do not rerun completed admin setup.
 - [ ] Confirm the Supabase bucket is private and upload size policy matches the Worker limit.
 - [ ] Run readiness endpoint and verify it reports expected blockers only.
 - [ ] Verify unauthenticated upload and admin calls are rejected.
@@ -49,8 +50,8 @@ Checked on 2026-10-31 using the Cloudflare Pages project configuration API for `
 - Production deployment currently points to commit `de77fe22b606ec64b2c5ba290cf7fde21b218120` (deployment created `2026-10-30T12:11:07Z`); the latest feature-branch Preview deployment is a separate deployment and is not Production.
 - Project subdomain is `golden-films.pages.dev`; Cloudflare returned no custom domains for this project.
 - Preview configuration lists a `DB` binding. Production configuration does not list a `DB` binding. This is a confirmed configuration discrepancy; verify the intended production database identity in the dashboard before making any change.
-- `SUPABASE_SERVICE_ROLE_KEY` is absent from the variable-name listing in both environments. Do not run upload integration tests until an authorized operator configures it securely.
-- Preview lists `ADMIN_SETUP_SECRET` by name; Production does not. Presence of a name alone does not prove the secret value is valid.
+- The site owner reports that Preview Supabase secret configuration was completed on 2026-11-01. The Cloudflare configuration API does not expose secret values for verification; runtime Storage checks remain pending. Production service-role secret state remains separate and unconfirmed.
+- Preview lists `ADMIN_SETUP_SECRET` by name; Production does not. Presence of a name alone does not prove the secret value is valid. Do not repeat initial admin setup if it is already complete.
 - `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET` names are present in both environments, but the project identity and private bucket settings have not been independently verified.
 - Live `/api/health` and `/api/ready` requests remain unverified because the available outbound request environment could not access the endpoints. This is not evidence that the endpoints themselves failed.
 - No Production secrets, database migrations, bindings, or configuration values were changed during this check.
