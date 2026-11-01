@@ -75,3 +75,17 @@ Expected for the unauthenticated admin requests: HTTP 401 with an unauthorized r
 
 Do not use these commands to test uploads, enquiry creation, admin setup, publishing, deletion, or database writes. Those require a separate controlled Preview test plan and cleanup. Do not copy the Preview database binding or secrets into Production as part of smoke testing.
 
+
+## 7. Preview D1 read-only schema verification — 2026-11-01
+
+The Cloudflare D1 API was used to inspect the designated Preview database bound to this feature branch. The database queries were read-only; no rows were written.
+
+- Latest confirmed successful Preview deployment at verification time: commit `dcf8df135a1af05efd8262bd7508418d0cc50a93`, deployment ID `a28e1812-b2bb-44e8-ad22-d6ec7c560f38`.
+- Required Worker-contract columns were present in the inspected Preview tables: categories, projects, project_translations, project_media, enquiries, enquiry_rate_limits, admin_users, admin_sessions, admin_setup, auth_rate_limits, audit_logs, site_content, site_content_revisions, and gf_monthly_media_usage.
+- `enquiries.email` is nullable, matching the Worker contract for enquiries that may be submitted with a phone number instead.
+- `PRAGMA foreign_key_check` returned zero violations.
+- Observed row counts: categories 14; admin_users 1; admin_sessions 3; admin_setup 1; site_content 5; projects 0; project_media 0; media 0; enquiries 0; site_content_revisions 0; gf_monthly_media_usage 0.
+
+**Interpretation:** this verifies the inspected Preview schema's required columns, email nullability, and foreign-key consistency only. It does not prove all unique conflict targets, application query compatibility, deployed API readiness, Supabase Storage connectivity, media upload, enquiry workflow, or Production schema compatibility. The zero project/media/enquiry counts mean there is no existing test data to validate those workflows from row inspection alone.
+
+Direct runtime access to the Preview `/api/health` and `/api/ready` URLs was still unavailable through the verification environment. Do not mark live API readiness as passed until those endpoints return a response and the sanitized status/body fields are reviewed.
