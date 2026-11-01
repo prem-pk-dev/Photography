@@ -308,3 +308,37 @@ test("customer logout clears the session cookie when the session is invalid", as
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
+
+test("customer login rejects malformed JSON without creating a session", async () => {
+  const writes: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("auth_rate_limits")) return { request_count: 1 } as T;
+          return null as T | null;
+        },
+        async run() {
+          writes.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{ malformed json",
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "invalid_credentials" });
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(writes.some((query) => query.includes("INSERT INTO customer_sessions")), false);
+});
