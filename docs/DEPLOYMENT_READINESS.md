@@ -97,3 +97,8 @@ Observed table definitions:
 This corrects the earlier broad description that Production's `categories` and `projects` are simply legacy: those tables have several Worker-facing columns already. Production is still **not compatible** with the current readiness contract because the missing role, consent, translation columns, CMS tables, and quota ledger remain unresolved. Do not blindly apply `0006_worker_schema_compat.sql`: it is explicitly a fresh-schema migration and includes `ALTER TABLE` operations that may collide with the existing Production schema (for example, columns already present). A dedicated forward-only migration must be designed and tested against a verified disposable restore of the exact Production export.
 
 **Task 3 result:** fresh-schema migrations and isolated fixture tests pass; Production forward-migration safety review remains blocked by Task 1 (the export has not been downloaded/restored and row-count/schema comparison is incomplete). Production remains untouched.
+
+
+### CI verification follow-up — 2026-11-01
+
+GitHub Actions run #680 for commit `199fb0b3f10551b64f04ca1c113a7f9d00d53b2a` completed successfully. The `build-and-test` job passed dependency installation, frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture test, fresh-schema contract fixture test, frontend build, Preview health/readiness smoke checks, and unauthenticated admin-route rejection checks. This confirms the branch checks pass; it does **not** replace the missing verified Production export restore. Task 3 remains blocked from final completion until Task 1 produces a durable backup and verified disposable restore for the exact Production schema/data.
