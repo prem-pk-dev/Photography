@@ -189,6 +189,6 @@ test("external media deletes its database row without calling Supabase Storage",
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, id: MEDIA_ID, storageDeleted: false });
     assert.equal(calls, 0);
-    assert.equal(state.mediaExists, false);
+    assert.equal(state.statements.some((q) => q.includes("gf_monthly_media_usage")), false);
   } finally { globalThis.fetch = originalFetch; }
 });
