@@ -918,7 +918,10 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  const customerAuthResponse = await handleCustomerAuth(request, env, url);\n  if (customerAuthResponse) return customerAuthResponse;\n\n  const adminAuthResponse = await handleAdminAuth(request, env, url);
+  const customerAuthResponse = await handleCustomerAuth(request, env, url);
+  if (customerAuthResponse) return customerAuthResponse;
+
+  const adminAuthResponse = await handleAdminAuth(request, env, url);
   if (adminAuthResponse) return adminAuthResponse;
   const contentResponse = await handleContentApi(request, env, url);
   if (contentResponse) return contentResponse;
