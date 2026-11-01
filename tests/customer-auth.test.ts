@@ -342,3 +342,35 @@ test("customer login rejects malformed JSON without creating a session", async (
   assert.equal(response.headers.get("set-cookie"), null);
   assert.equal(writes.some((query) => query.includes("INSERT INTO customer_sessions")), false);
 });
+
+test("customer login is rate limited before account lookup", async () => {
+  const queries: string[] = [];
+  const db = {
+    prepare(query: string) {
+      queries.push(query);
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("auth_rate_limits")) return { request_count: 11 } as T;
+          throw new Error("Account lookup must not run after rate limiting");
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "192.0.2.10" },
+      body: JSON.stringify({ email: "customer@example.com", password: "GoldenFilms!2026" }),
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "temporarily_unavailable" });
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(queries.some((query) => query.includes("FROM customer_users")), false);
+});
