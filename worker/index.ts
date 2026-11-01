@@ -583,6 +583,21 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
     }
   }
 
+  if (path === "/api/customer/logout") {
+    const token = cookieValue(request, "__Host-gf_customer");
+    try {
+      if (token && token.length <= 256) {
+        await env.DB.prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+      }
+      // Logout is idempotent: stale or expired cookies must still be cleared client-side.
+      const response = json({ ok: true });
+      response.headers.append("set-cookie", customerCookie("", 0));
+      return response;
+    } catch {
+      return json({ error: "customer_logout_unavailable" }, 503);
+    }
+  }
+
   if (path === "/api/customer/session" || path === "/api/customer/profile") {
     const customer = await currentCustomer(request, env);
     if (!customer) return json({ error: "unauthorized" }, 401);
@@ -601,17 +616,6 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
     }
   }
 
-  const customer = await currentCustomer(request, env);
-  if (!customer) return json({ error: "unauthorized" }, 401);
-  try {
-    const token = cookieValue(request, "__Host-gf_customer");
-    await env.DB.prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
-    const response = json({ ok: true });
-    response.headers.append("set-cookie", customerCookie("", 0));
-    return response;
-  } catch {
-    return json({ error: "customer_logout_unavailable" }, 503);
-  }
 }
 
 async function supportedEnquiryStatuses(db: D1Binding): Promise<string[]> {
