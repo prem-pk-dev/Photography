@@ -1,6 +1,6 @@
 # Golden Films media deletion — implementation design
 
-Status: delete route is still design-only. Additive cleanup-ledger migration `migrations/0101_gf_media_cleanup_jobs.sql` has been drafted on the feature branch; it has NOT been applied to Preview or Production.
+Status: owner-only delete route is implemented on the feature branch with an additive cleanup ledger and automated route tests. The migration `migrations/0101_gf_media_cleanup_jobs.sql` has NOT been applied to Preview or Production. Runtime behavior against a disposable Supabase object and isolated Preview D1 is still unverified.
 
 ## Goals
 
@@ -55,9 +55,9 @@ Do not add a schema change to Production until backup/restore gates pass. The le
 
 - [ ] Confirm Supabase Storage exact-object delete contract and status codes from current official docs.
 - [x] Draft additive cleanup-ledger migration `migrations/0101_gf_media_cleanup_jobs.sql` on the feature branch (not applied anywhere).\n- [ ] Execute migration and preservation checks on an isolated test database only.
-- [ ] Implement cleanup ledger plus retry/reconciliation.
-- [ ] Add injected Storage and D1 failure tests.
-- [ ] CI passes on the feature branch.
+- [x] Implement owner-only delete route and durable cleanup ledger; repeated POST requests retry incomplete jobs.\n- [ ] Add a scheduled/background reconciler for jobs that never receive another request.
+- [x] Add injected Storage failure test.\n- [ ] Add and verify injected final-D1 failure and duplicate-request recovery tests.
+- [ ] CI passes on the latest feature-branch commit.
 - [ ] Verify live upload/read/delete with a disposable Preview object only, after confirming configured Preview credentials without exposing secrets.
 - [ ] Review Production D1 backup artifact on PC; verify restore procedure before any Production schema/data change.
 - [ ] Keep PR #87 and PR #63 unmerged until all relevant release gates are satisfied.
