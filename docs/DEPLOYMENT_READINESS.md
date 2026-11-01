@@ -33,14 +33,21 @@ The Cloudflare D1 API returned `changed_db: false` and `rows_written: 0` for the
 
 **Preview D1 — rechecked, binding/schema identity task complete:** the latest Cloudflare Pages deployment metadata confirms that Preview's `DB` binding points to D1 ID `21f470cb-776a-4eb2-816e-16605139299a`. A new read-only schema check against that exact ID confirms the required fields/tables are present: `admin_users.role`, `enquiries.consent`, `categories.slug`, `projects.slug/category_id/cover_object_key/status`, `project_translations.language/alt_text`, `site_content`, `site_content_revisions`, and `gf_monthly_media_usage.month_key/used_bytes`. The D1 API reported `changed_db: false` and `rows_written: 0` for all eight table checks. This supersedes the earlier Preview mismatch observation; it did not reproduce on the current bound database. CI run #666 previously confirmed `/api/ready` returned HTTP 200 and `status=ready` with no blockers. The exact latest Preview URL's `/api/ready` endpoint could not be independently fetched in this recheck, so rerun the live health/readiness smoke test in final release verification. This result applies only to Preview and does not resolve Production's legacy schema.
 
+### Production backup / restore drill update (2026-11-01)
+
+- Verified the Production D1 identity read-only: `golden-films-db`, ID `0241231b-6e6c-410b-a5ac-958eeb424a78`, version `production`.
+- Cloudflare D1 export job returned `status=complete` and reported the SQL dump uploaded in one part.
+- **The backup/restore task is not complete yet.** The generated download URL is temporary (one hour). The available execution environment denied fetching the R2 export URL (`403: requests to ...r2.cloudflarestorage.com are not allowed`), and the local runtime has no network DNS access. Therefore the SQL dump was not downloaded to durable storage and could not be restored into a disposable database/SQLite fixture. No Production DDL/DML was run, and no Production data was changed.
+- Next safe step: download the export through an approved Cloudflare Dashboard/CLI environment with access to the temporary URL, retain the SQL dump securely, restore it to a disposable database, and compare table schemas plus per-table row counts. Do not mark the backup/restore gate complete until this succeeds.
+
 ### Supabase Storage configuration gate
 
 The Cloudflare Pages project configuration returned a Preview storage bucket and Supabase URL, while the Production deployment configuration did not list `SUPABASE_SERVICE_ROLE_KEY`. The secret value itself is not inspected or disclosed. Before production media is enabled, configure the service-role secret through Cloudflare's secret-management UI or approved secret workflow, then verify only the readiness endpoint's boolean presence result. Never put the secret in Git or in logs.
 
 ### Required release blockers
 
-1. Export Production D1 and verify the export completed.
-2. Restore that export to a disposable database or isolated SQLite fixture.
+1. ~~Start Production D1 export and verify Cloudflare reports completion.~~ **Export job completed 2026-11-01; durable download and restore remain blocked** by restricted access to the temporary R2 download URL (details above).
+2. Download the SQL export to secure durable storage and restore it to a disposable database or isolated SQLite fixture.
 3. Run the reviewed forward migration against the disposable copy and verify all data, keys, indexes, constraints, and foreign keys.
 4. ~~Reconcile and validate the actual Preview D1 schema against the current Worker readiness contract.~~ **Completed 2026-11-01:** binding ID and required columns verified read-only; repeat live endpoint smoke checks in final verification.
 5. Confirm production storage secret configuration without exposing the secret.
