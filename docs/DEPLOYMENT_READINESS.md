@@ -30,7 +30,7 @@ The Cloudflare D1 API returned `changed_db: false` and `rows_written: 0` for the
 - `gf_monthly_media_usage` is absent.
 - Production's `projects` and `categories` schemas are legacy versions and must be reconciled with the current Worker contract before write-capable release.
 
-**Preview D1** contains a newer but different schema shape; it is not evidence that Production is migrated. The current Worker readiness contract requires exact columns and tables, so run the deployed readiness endpoint and verify its response after any approved Preview schema correction. Never assume that one successful CI fixture means the configured live D1 binding has the same schema.
+**Preview D1** also does not match the current Worker readiness contract in the direct D1 schema response: its `categories` table lacks the expected `slug` column, `projects` uses a different required-column shape, `project_translations` uses `language` as its key but has a nullable `locale`, and the database's table set differs from the Worker contract. This conflicts with CI run #666, whose deployed Preview `/api/ready` smoke check returned HTTP 200 and `status=ready` with no blockers. Treat this as an unresolved binding/schema identity discrepancy: verify which D1 database the deployed Preview Worker actually queries before considering Preview verified. Do not suppress this mismatch or infer that a green endpoint smoke test means the directly inspected D1 schema is compatible.
 
 ### Supabase Storage configuration gate
 
