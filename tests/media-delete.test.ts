@@ -74,7 +74,9 @@ function makeDb(options: { role?: "owner" | "editor"; cover?: boolean; external?
       }
       // D1Statement mocks don't expose query; capture behavior from the ordered batch length
       // and the route's job state to emulate the two transaction phases.
-      if (!state.job) {
+      if (state.external && !state.job) {
+        state.mediaExists = false;
+      } else if (!state.job) {
         state.job = { id: "job_123", media_id: MEDIA_ID, project_id: PROJECT_ID, storage_key: KEY, status: "pending" };
         state.hidden = true;
       } else {
