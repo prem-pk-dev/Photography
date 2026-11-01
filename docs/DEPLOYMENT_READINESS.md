@@ -124,3 +124,13 @@ Remaining acceptance criteria:
 5. Run safe synthetic enquiry/media tests in an isolated environment and re-check CI before release.
 
 No Production configuration changes were made because the missing secrets cannot be safely invented or recovered, and the D1 binding/schema change depends on the incomplete Task 3 backup/restore gate. Task 4 is not marked complete.
+
+
+### Task 3 / Task 4 continuation — 2026-11-01
+
+**Outcome: safe verification attempted; both tasks remain blocked on external prerequisites.** No Production D1 writes, Pages setting changes, secret changes, or deployments were made.
+
+- Attempted live GET checks for `/api/health` and `/api/ready` on both `https://golden-films.pages.dev` and the canonical Production deployment `https://37df287e.golden-films.pages.dev`. The available execution environment returned `403: requests to <host> are not allowed` for all four requests. These are environment-policy denials, not the website's HTTP responses; live Production health/readiness therefore remains unverified. Do not interpret the 403 as an application failure or success.
+- Task 3 still requires a durable copy of the completed D1 export, restore into a disposable database/fixture, and forward-migration + data/constraint verification on that restored copy. The earlier temporary R2 export URL was inaccessible from this execution environment. Starting another export would again create a temporary URL and may block Production D1 while the export runs; it would not solve the download restriction, so it was not restarted.
+- Task 4 still requires configuring the missing Production secrets through an approved Cloudflare secret workflow, reconciling the Production D1 schema, adding the Production `DB` binding only after the Task 3 restore/migration gate, and running live checks from an approved environment that can reach the Pages hostname.
+- **Next action needed outside this restricted execution environment:** use the Cloudflare Dashboard or an approved CLI/network environment to securely download the existing D1 SQL export (or create a new export only during an approved maintenance window), restore it to an isolated database, and complete the migration drill. Configure secrets directly in Cloudflare's secret UI; never paste secret values into chat or Git. Then perform the approved Production release checks.
