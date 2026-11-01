@@ -33,7 +33,7 @@ test("customer auth fails closed when Preview D1 binding is missing", async () =
   }
 });
 
-test("customer logout requires a valid customer session", async () => {
+test("customer logout is idempotent without a session and clears the cookie", async () => {
   const db = {
     prepare(_query: string) {
       return {
@@ -48,8 +48,9 @@ test("customer logout requires a valid customer session", async () => {
     new Request("https://example.test/api/customer/logout", { method: "POST" }),
     { DB: db },
   );
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "unauthorized" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
 });
 
 
@@ -285,7 +286,7 @@ test("customer session rejects an invalid session cookie", async () => {
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
 
-test("customer logout clears the session cookie when the session is invalid", async () => {
+test("customer logout clears a stale or invalid session cookie", async () => {
   const db = {
     prepare(_query: string) {
       return {
@@ -305,8 +306,9 @@ test("customer logout clears the session cookie when the session is invalid", as
     { DB: db },
   );
 
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "unauthorized" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
 });
 
 test("customer login rejects malformed JSON without creating a session", async () => {
