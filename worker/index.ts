@@ -1558,10 +1558,12 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
             "INSERT INTO gf_media_cleanup_jobs (id, media_id, project_id, storage_key, status) " +
             "SELECT ?, m.id, m.project_id, m.original_key, 'pending' FROM project_media m " +
             "JOIN projects p ON p.id = m.project_id WHERE m.id = ? AND m.project_id = ? " +
-            "AND m.original_key = ? AND m.preview_url <> p.cover_image_url"
+            "AND m.original_key = ? AND m.preview_url IS NOT p.cover_image_url"
           ).bind(jobId, id, current.project_id, key),
-          env.DB.prepare("UPDATE project_media SET is_public = 0 WHERE id = ? AND project_id = ? AND original_key = ?")
-            .bind(id, current.project_id, key),
+          env.DB.prepare(
+            "UPDATE project_media SET is_public = 0 WHERE id = ? AND project_id = ? AND original_key = ? " +
+            "AND EXISTS (SELECT 1 FROM gf_media_cleanup_jobs WHERE id = ?)"
+          ).bind(id, current.project_id, key, jobId),
           env.DB.prepare(
             "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
             "SELECT ?, ?, 'media_delete_started', 'media', ? WHERE EXISTS " +
@@ -1597,19 +1599,25 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       }
 
       try {
-        await env.DB.batch([
+        const finalResults = await env.DB.batch([
           env.DB.prepare(
             "DELETE FROM project_media WHERE id = ? AND project_id = ? AND original_key = ? " +
             "AND NOT EXISTS (SELECT 1 FROM projects WHERE id = ? AND cover_image_url = project_media.preview_url)"
           ).bind(job.media_id, job.project_id, key, job.project_id),
           env.DB.prepare(
             "UPDATE gf_media_cleanup_jobs SET status = 'complete', attempt_count = attempt_count + 1, " +
-            "last_error_code = NULL, updated_at = datetime('now'), completed_at = datetime('now') WHERE id = ?"
-          ).bind(job.id),
+            "last_error_code = NULL, updated_at = datetime('now'), completed_at = datetime('now') " +
+            "WHERE id = ? AND NOT EXISTS (SELECT 1 FROM project_media WHERE id = ?)"
+          ).bind(job.id, job.media_id),
           env.DB.prepare(
-            "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, 'media_deleted', 'media', ?)"
-          ).bind(crypto.randomUUID(), admin.id, job.media_id),
+            "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
+            "SELECT ?, ?, 'media_deleted', 'media', ? WHERE EXISTS " +
+            "(SELECT 1 FROM gf_media_cleanup_jobs WHERE id = ? AND status = 'complete')"
+          ).bind(crypto.randomUUID(), admin.id, job.media_id, job.id),
         ]);
+        if ((finalResults[1]?.meta?.changes ?? 0) !== 1) {
+          return json({ error: "media_delete_cleanup_pending", retryable: true }, 503);
+        }
       } catch (error) {
         // Storage is already gone. Leave the durable job incomplete so a repeated
         // request can safely repeat the idempotent Storage removal and finish D1 cleanup.
