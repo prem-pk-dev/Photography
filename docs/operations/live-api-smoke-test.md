@@ -58,3 +58,20 @@ Do not test live enquiry creation, media upload/delete, admin setup, database mi
 ## Current known limitation
 
 The prior verification attempt could not access the candidate `golden-films.pages.dev` URL from the available environment. This is an access limitation, not proof that the deployment is down. Confirm the actual Pages URL and deployment commit in the Cloudflare dashboard before recording live verification as passed.
+
+## 6. Preview-first verification (recommended before any write-path test)
+
+Use a successful **Preview** deployment from the feature branch, not the production domain. Confirm the deployment commit and that its `DB` binding points to the designated disposable Preview D1 database before running these read-only checks.
+
+```sh
+BASE_URL='https://CONFIRMED-PREVIEW-DEPLOYMENT.pages.dev'
+curl --fail-with-body --silent --show-error --max-time 15 -D /tmp/gf-preview-health.headers "$BASE_URL/api/health" -o /tmp/gf-preview-health.json
+curl --fail-with-body --silent --show-error --max-time 15 -D /tmp/gf-preview-ready.headers "$BASE_URL/api/ready" -o /tmp/gf-preview-ready.json
+curl --silent --show-error --max-time 15 -i "$BASE_URL/api/admin/content"
+curl --silent --show-error --max-time 15 -i "$BASE_URL/api/admin/content/revisions?page=home"
+```
+
+Expected for the unauthenticated admin requests: HTTP 401 with an unauthorized response. For `/api/ready`, record only HTTP status, boolean readiness fields, and blocker names; do not share cookies, tokens, secret values, or unredacted logs. A reported `supabase_storage_not_configured` blocker means the Storage integration is not yet verified, even if secret configuration was completed in the dashboard.
+
+Do not use these commands to test uploads, enquiry creation, admin setup, publishing, deletion, or database writes. Those require a separate controlled Preview test plan and cleanup. Do not copy the Preview database binding or secrets into Production as part of smoke testing.
+
