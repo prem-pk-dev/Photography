@@ -50,3 +50,63 @@ test("schema audit is read-only and reports missing required columns", () => {
   assert.match(audit, /WHEN NOT EXISTS \([\s\S]*THEN 'MISSING'/i);
   assert.doesNotMatch(audit, /^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|ALTER|DROP|ATTACH|DETACH)\b/im);
 });
+
+
+const forwardMigration = await readFile(
+  new URL("../docs/forward-migrations/2026-10-29-live-schema-forward.sql", import.meta.url),
+  "utf8",
+);
+const migrationFixture = await readFile(
+  new URL("../scripts/test-forward-migration.py", import.meta.url),
+  "utf8",
+);
+const workflow = await readFile(
+  new URL("../.github/workflows/ci.yml", import.meta.url),
+  "utf8",
+);
+
+test("production D1 migration is gated on a verified export and disposable restore", () => {
+  assert.match(
+    forwardMigration,
+    /DO NOT run against production until a verified D1 export has been restored to\s*-- a disposable database/i,
+    "migration must explicitly block production use before backup restore validation",
+  );
+  assert.match(
+    forwardMigration,
+    /Historical enquiries receive consent=0/i,
+    "migration must not infer historical consent",
+  );
+  assert.match(
+    migrationFixture,
+    /preserve every captured legacy column value/i,
+    "fixture must compare actual legacy values, not only row counts",
+  );
+  assert.match(
+    workflow,
+    /python3 scripts\/test-forward-migration\.py/,
+    "CI must run the data-preservation migration fixture",
+  );
+});
+
+test("database recovery and migration checks are non-destructive by default", () => {
+  for (const [label, source] of [
+    ["live schema audit", audit],
+    ["migration verifier", sql],
+  ]) {
+    assert.doesNotMatch(
+      source,
+      /^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|ALTER|DROP|ATTACH|DETACH)\b/im,
+      `${label} must remain read-only`,
+    );
+  }
+  assert.match(
+    migrationFixture,
+    /TemporaryDirectory\(\)/,
+    "migration rehearsal must use a disposable temporary SQLite database",
+  );
+  assert.match(
+    migrationFixture,
+    /PRAGMA foreign_key_check/i,
+    "migration rehearsal must check referential integrity before acceptance",
+  );
+});
