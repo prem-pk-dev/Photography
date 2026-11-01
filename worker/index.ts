@@ -1280,7 +1280,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const projectId = existing?.id ?? crypto.randomUUID();
       const projectColumns = await env.DB.prepare("PRAGMA table_info(projects)").all<{ name: string }>();
       const projectColumnNames = new Set((projectColumns.results ?? []).map(column => column.name));
-      let projectStatement: D1PreparedStatement;
+      let projectStatement: D1Statement;
       if (projectColumnNames.has("category_id") && projectColumnNames.has("cover_object_key") && projectColumnNames.has("featured")) {
         // Legacy live D1 schema: preserve its required columns as well as the
         // newer API-facing compatibility columns.
