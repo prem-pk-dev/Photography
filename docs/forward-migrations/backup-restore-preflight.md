@@ -38,6 +38,10 @@ The production database has a legacy schema that differs from the Worker contrac
 - [ ] Worker regression tests and readiness checks passed
 - [ ] Independent review and explicit production go/no-go recorded
 
-## Current result
+## Current result (updated 2026-11-01)
 
-No production export or restore has been performed as part of preparing this runbook. Production schema/data have not been changed. The next step requires an operator with Cloudflare account access to schedule and execute the export/restore; it is not safe to simulate this gate using only a synthetic fixture.
+- Production D1 identity was re-confirmed by API: `golden-films-db` / `0241231b-6e6c-410b-a5ac-958eeb424a78`; 12 tables, reported size 163,840 bytes.
+- A fresh Cloudflare D1 SQL export job completed at bookmark `00000046-00000000-00005116-f02a54bfc1872ec9b09121b3373d0fbc`. Cloudflare returned a temporary signed URL, but download attempts from the available execution environment returned HTTP 403. The SQL file was therefore **not downloaded or independently verified**, and the export is not yet a usable recovery artifact.
+- A separate disposable D1 database, `golden-films-forward-migration-test-20261101` (`b276f110-c3a4-448a-8950-824497b43438`), was created and seeded with a **synthetic legacy-schema fixture** (one sample admin, category, project, two translations and enquiry; no production rows). The exact candidate forward migration ran successfully on this fixture.
+- Post-migration fixture checks passed: translation row count preserved (2), enquiry count preserved (1), admin count preserved (1); nullable `enquiries.email`; `consent INTEGER NOT NULL DEFAULT 0`; `admin_users.role TEXT NOT NULL DEFAULT 'editor'`; CMS and monthly quota tables present; translation conflict-target unique index present; project/translation/media orphan checks returned zero; translation locale/language and admin-role domain checks returned zero violations; `pragma_foreign_key_check` returned zero rows.
+- This is useful compatibility evidence, **not a verified restore of the actual Production export**. Production schema/data have not been changed. Task 3 remains blocked until the actual export is downloaded and restored into a disposable D1 database, then the migration and checks are run against that restored copy.
