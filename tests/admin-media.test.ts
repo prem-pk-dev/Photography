@@ -779,3 +779,90 @@ test("media upload keeps the quota reservation and returns cleanup-pending when 
     console.error = originalConsoleError;
   }
 });
+
+
+test("owner media upload stores the object and commits media metadata with monthly quota reservation", async () => {
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  const queries: string[] = [];
+  let batchCalls = 0;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { queries.push(query); return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT id, status FROM projects")) {
+            return { id: projectId, status: "draft" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+    async batch(_statements: unknown[]) {
+      batchCalls += 1;
+      if (batchCalls === 1) {
+        return [
+          { success: true, meta: { changes: 0 } },
+          { success: true, meta: { changes: 1 } },
+        ];
+      }
+      return [{ success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 1 } }];
+    },
+  };
+
+  const form = new FormData();
+  form.set("projectId", projectId);
+  form.set("altEn", "Wedding details");
+  form.set("altHi", "शादी की तस्वीर");
+  form.set("isPublic", "true");
+  form.set("isCover", "true");
+  form.set("file", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01])], {
+    type: "image/jpeg",
+  }), "wedding.jpg");
+
+  const originalFetch = globalThis.fetch;
+  const storageCalls: Array<{ url: string; method: string; contentType: string | null }> = [];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    storageCalls.push({
+      url: String(input),
+      method: init?.method ?? (input instanceof Request ? input.method : "GET"),
+      contentType: new Headers(init?.headers).get("content-type"),
+    });
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/admin/projects/media/upload", {
+      method: "POST",
+      headers: { Cookie: "__Host-gf_admin=valid-owner-session" },
+      body: form,
+    }), {
+      DB: db,
+      SUPABASE_URL: "https://photography-test.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "server-only-test-secret",
+      SUPABASE_STORAGE_BUCKET: "golden-films-media",
+    } as never);
+
+    assert.equal(response.status, 201);
+    const body = await response.json() as { ok: boolean; id: string; previewUrl: string; isPublic: boolean; isCover: boolean; monthlyLimitBytes: number };
+    assert.equal(body.ok, true);
+    assert.equal(body.isPublic, true);
+    assert.equal(body.isCover, true);
+    assert.equal(body.monthlyLimitBytes, 100 * 1024 * 1024);
+    assert.match(body.previewUrl, /^\/api\/media\/projects\//);
+    assert.equal(storageCalls.length, 1);
+    assert.equal(storageCalls[0].method, "POST");
+    assert.match(storageCalls[0].url, /\/storage\/v1\/object\/golden-films-media\/projects\//);
+    assert.equal(storageCalls[0].contentType, "image/jpeg");
+    assert.equal(batchCalls, 2, "reserve quota then atomically write media, cover, and audit records");
+    assert.ok(queries.some(query => query.includes("INSERT INTO project_media")));
+    assert.ok(queries.some(query => query.includes("UPDATE projects SET cover_image_url")));
+    assert.ok(queries.some(query => query.includes("INSERT INTO audit_logs")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
