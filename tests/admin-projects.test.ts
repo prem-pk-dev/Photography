@@ -72,7 +72,6 @@ test("public media route fails closed when R2 is not configured", async () => {
 
 test("admin project save batches project, bilingual translations, and audit atomically", async () => {
   const statements: string[] = [];
-  const projectId = "11111111-1111-4111-8111-111111111111";
   let batchCalls = 0;
   const db = {
     prepare(query: string) {
@@ -120,7 +119,9 @@ test("admin project save batches project, bilingual translations, and audit atom
   }), { DB: db });
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, id: projectId, slug: "wedding-day-2026", status: "draft" });
+  const body = await response.json() as { ok: boolean; id: string; slug: string; status: string };
+  assert.deepEqual({ ...body, id: undefined }, { ok: true, id: undefined, slug: "wedding-day-2026", status: "draft" });
+  assert.match(body.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   assert.equal(batchCalls, 1, "all four database writes must share one D1 transaction");
   assert.equal(statements.filter(query => query.includes("INSERT INTO project_translations")).length, 2);
   assert.equal(statements.filter(query => query.includes("INSERT INTO audit_logs")).length, 1);
