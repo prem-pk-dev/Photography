@@ -225,3 +225,38 @@ test("customer login rejects malformed email without creating a session", async 
   assert.equal(response.headers.get("set-cookie"), null);
   assert.equal(writes.some((query) => query.includes("INSERT INTO customer_sessions")), false);
 });
+
+test("customer login uses generic credentials error for unknown accounts", async () => {
+  const writes: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("auth_rate_limits")) return { request_count: 1 } as T;
+          if (query.includes("FROM customer_users")) return null as T | null;
+          return null as T | null;
+        },
+        async run() {
+          writes.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "unknown@example.com", password: "GoldenFilms!2026" }),
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "invalid_credentials" });
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(writes.some((query) => query.includes("INSERT INTO customer_sessions")), false);
+});
