@@ -110,3 +110,43 @@ test("customer session and profile endpoints reject requests without a valid ses
   }
 });
 
+test("customer registration rejects weak passwords before creating an account", async () => {
+  const executed: string[] = [];
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("auth_rate_limits")) return { request_count: 1 } as T;
+          return null as T | null;
+        },
+        async run() {
+          executed.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Test Customer",
+        email: "customer@example.com",
+        phone: "",
+        password: "short",
+      }),
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "validation_failed",
+    requirements: "Use a name, valid email, and a 12–128 character password.",
+  });
+  assert.equal(executed.some((query) => query.includes("INSERT INTO customer_users")), false);
+});
