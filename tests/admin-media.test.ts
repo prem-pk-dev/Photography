@@ -484,3 +484,81 @@ test("editor can create private draft media with an audit entry", async () => {
   assert.ok(executed.some((entry) => entry.query.includes("INSERT INTO project_media")));
   assert.ok(executed.some((entry) => entry.query.includes("INSERT INTO audit_logs") && entry.args.includes("media_added_draft")));
 });
+
+
+test("public media route does not fetch Storage objects unless D1 marks media public on a published project", async () => {
+  let storageCalls = 0;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("WHERE m.original_key = ? AND m.is_public = 1 AND p.status = 'published'")) {
+            return null as T | null;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    storageCalls += 1;
+    return new Response("should not be fetched", { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/media/projects/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002.jpg"),
+      {
+        DB: db,
+        SUPABASE_URL: "https://storage.example.test",
+        SUPABASE_SERVICE_ROLE_KEY: "test-only-not-a-real-secret",
+        SUPABASE_STORAGE_BUCKET: "test-bucket",
+      },
+    );
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "media_not_found" });
+    assert.equal(storageCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("public media route rejects malformed object keys before querying Storage", async () => {
+  let storageCalls = 0;
+  const db = {
+    prepare(_query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    storageCalls += 1;
+    return new Response("should not be fetched", { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/media/projects/not-a-valid-object-key"),
+      {
+        DB: db,
+        SUPABASE_URL: "https://storage.example.test",
+        SUPABASE_SERVICE_ROLE_KEY: "test-only-not-a-real-secret",
+        SUPABASE_STORAGE_BUCKET: "test-bucket",
+      },
+    );
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "media_not_found" });
+    assert.equal(storageCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
