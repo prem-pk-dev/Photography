@@ -10,7 +10,7 @@ BRIDGE = ROOT / "migrations" / "0006_worker_schema_compat.sql"
 REQUIRED_COLUMNS = {
     "categories": {"id", "slug", "sort_order", "title_en", "title_hi", "description_en", "description_hi"},
     "projects": {"id", "slug", "category_slug", "cover_image_url", "status", "is_featured", "project_date", "updated_at", "demo_label"},
-    "project_translations": {"project_id", "locale", "title", "description"},
+    "project_translations": {"project_id", "language", "locale", "title", "description", "alt_text"},
     "project_media": {"id", "project_id", "media_type", "preview_url", "original_key", "alt_en", "alt_hi", "sort_order", "is_public", "created_at"},
     "enquiries": {"id", "name", "email", "phone", "service", "preferred_date", "budget_range", "message", "consent", "status", "created_at", "updated_at"},
     "enquiry_rate_limits": {"ip_hash", "window_start", "request_count"},
@@ -133,6 +133,16 @@ def main():
         "SELECT title FROM project_translations WHERE project_id='project-test' AND locale='en'"
     ).fetchone()[0]
     assert title == "First title", title
+    translation = db.execute(
+        "SELECT language, locale, alt_text FROM project_translations WHERE project_id='project-test' AND locale='en'"
+    ).fetchone()
+    assert translation["language"] == "en" and translation["locale"] == "en", translation
+    assert translation["alt_text"] == "English alt", translation
+    hindi_translation = db.execute(
+        "SELECT language, locale, title, alt_text FROM project_translations WHERE project_id='project-test' AND locale='hi'"
+    ).fetchone()
+    assert hindi_translation["language"] == "hi" and hindi_translation["locale"] == "hi", hindi_translation
+    assert hindi_translation["title"] == "पहला शीर्षक" and hindi_translation["alt_text"] == "हिंदी alt", hindi_translation
     db.execute(
         "INSERT INTO project_translations (project_id, language, locale, title, description) "
         "VALUES ('project-test', 'en', 'en', 'Updated title', 'Updated description') "
