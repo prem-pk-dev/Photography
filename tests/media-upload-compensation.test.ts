@@ -110,3 +110,48 @@ test("media upload retains quota and reports pending cleanup when Storage deleti
     globalThis.fetch = originalFetch;
   }
 });
+
+test("media upload stops before Storage when the monthly quota reservation is denied", async () => {
+  let storageCalls = 0;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT id, status FROM projects")) {
+            return { id: PROJECT_ID, status: "draft" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+    async batch(_statements: unknown[]) {
+      return [
+        { success: true, meta: { changes: 0 } },
+        { success: true, meta: { changes: 0 } },
+      ];
+    },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    storageCalls += 1;
+    return new Response(null, { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(uploadRequest(), { DB: db, ...storageEnv } as never);
+    assert.equal(response.status, 413);
+    const body = await response.json();
+    assert.equal(body.error, "monthly_upload_quota_exceeded");
+    assert.equal(body.limitBytes, 100 * 1024 * 1024);
+    assert.equal(typeof body.month, "string");
+    assert.equal(storageCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
