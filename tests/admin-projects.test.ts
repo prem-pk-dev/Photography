@@ -97,7 +97,7 @@ test("admin project save batches project, bilingual translations, and audit atom
         },
       };
     },
-    async batch(batchStatements: Array<{ sql?: string }>) {
+    async batch(batchStatements: unknown[]) {
       batchCalls += 1;
       return batchStatements.map(() => ({ success: true, meta: { changes: 1 } }));
     },
