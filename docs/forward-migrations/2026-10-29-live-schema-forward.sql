@@ -2,11 +2,9 @@
 -- DO NOT run against production until a verified D1 export has been restored to
 -- a disposable database and this exact migration plus the verification queries pass.
 -- Historical enquiries receive consent=0: do not infer consent from old records.
--- The current category API selects bilingual descriptions; the legacy schema has
--- title_en/title_hi but lacks description_en/description_hi. Additive defaults keep
--- existing categories readable without inventing descriptions.
-ALTER TABLE categories ADD COLUMN description_en TEXT NOT NULL DEFAULT '';
-ALTER TABLE categories ADD COLUMN description_hi TEXT NOT NULL DEFAULT '';
+-- The exported Production schema already includes description_en/description_hi
+-- on categories. Do not add them again: SQLite would reject duplicate columns.
+-- The compatibility check below verifies these columns exist before migration.
 
 --
 -- The live enquiries.email column is NOT NULL, but the current API permits phone-only
