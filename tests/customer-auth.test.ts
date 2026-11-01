@@ -401,3 +401,34 @@ test("customer registration rate limit returns 429", async () => {
   assert.deepEqual(await response.json(), { error: "temporarily_unavailable" });
   assert.equal(response.headers.get("set-cookie"), null);
 });
+
+
+test("customer session lookup excludes expired sessions and inactive accounts", async () => {
+  const queries: string[] = [];
+  const db = {
+    prepare(query: string) {
+      queries.push(query);
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/session", {
+      method: "GET",
+      headers: { cookie: "__Host-gf_customer=expired-session-token" },
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "unauthorized" });
+  const sessionQuery = queries.find((query) => query.includes("FROM customer_sessions"));
+  assert.ok(sessionQuery, "customer session query should run");
+  assert.match(sessionQuery, /s\.expires_at > datetime\('now'\)/);
+  assert.match(sessionQuery, /u\.is_active = 1/);
+});
