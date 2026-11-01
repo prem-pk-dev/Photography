@@ -8,7 +8,7 @@ test("customer auth routes reject unsupported methods", async () => {
     ["https://example.test/api/customer/login", "GET", "POST"],
     ["https://example.test/api/customer/logout", "GET", "POST"],
     ["https://example.test/api/customer/session", "POST", "GET"],
-    ["https://example.test/api/customer/session", "PUT", "GET"],
+    ["https://example.test/api/customer/session", "PUT", "GET, POST, OPTIONS"],
     ["https://example.test/api/customer/profile", "POST", "GET, PUT"],
   ] as const;
 
@@ -58,7 +58,7 @@ test("customer registration accepts email addresses containing the letter s", as
     prepare(_query: string) {
       return {
         bind(..._args: unknown[]) { return this; },
-        async first<T>() { return null as T | null; },
+        async first<T>() { return { request_count: 1 } as T; },
         async run() { return { success: true, meta: { changes: 1 } }; },
         async all<T>() { return { success: true, results: [] as T[] }; },
       };
