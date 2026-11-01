@@ -10,6 +10,7 @@ const migrationFiles = [
   "0005_admin_roles.sql",
   "0006_worker_schema_compat.sql",
   "0100_customer_auth_foundation.sql",
+  "0101_gf_media_cleanup_jobs.sql",
 ];
 
 const migrations = migrationFiles
@@ -32,6 +33,7 @@ const workerContract: Record<string, string[]> = {
   audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
   site_content: ["page_slug", "draft_json", "published_json", "status", "updated_at"],
   site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "created_at"],
+  gf_media_cleanup_jobs: ["id", "media_id", "project_id", "storage_key", "status", "attempt_count", "last_error_code", "created_at", "updated_at", "completed_at"],
 };
 
 function tableBody(table: string): string | null {
@@ -94,4 +96,19 @@ test("live forward migration preserves translations and supports Worker language
   );
   assert.match(liveForwardMigration, /DROP\s+TABLE\s+project_translations/i);
   assert.match(liveForwardMigration, /ALTER\s+TABLE\s+project_translations_new\s+RENAME\s+TO\s+project_translations/i);
+});
+
+
+test("media cleanup ledger migration enforces retry state and safe storage keys", () => {
+  const cleanupMigration = readFileSync(
+    new URL("../migrations/0101_gf_media_cleanup_jobs.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(cleanupMigration, /storage_key TEXT NOT NULL CHECK \(length\(trim\(storage_key\)\) > 0\)/i);
+  assert.match(cleanupMigration, /status TEXT NOT NULL DEFAULT 'pending'[\s\S]*CHECK \(status IN \('pending', 'failed', 'complete'\)\)/i);
+  assert.match(cleanupMigration, /attempt_count INTEGER NOT NULL DEFAULT 0 CHECK \(attempt_count >= 0\)/i);
+  assert.match(cleanupMigration, /length\(last_error_code\) <= 80/i);
+  assert.match(cleanupMigration, /idx_gf_media_cleanup_jobs_retry/i);
+  assert.match(cleanupMigration, /idx_gf_media_cleanup_jobs_media/i);
+  assert.doesNotMatch(cleanupMigration, /^\\s*(UPDATE|DELETE|DROP)\\b/im);
 });
