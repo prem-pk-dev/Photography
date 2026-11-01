@@ -250,8 +250,8 @@ export default function App() {
             <p className="hero-services">Photography <b>·</b> Videography <b>·</b> Photo Editing <b>·</b> Video Editing</p>
             <p className="hero-description">{t.heroText}</p>
             <div className="hero-buttons">
-              <a className="button button-gold" href="#categories">{t.viewPortfolio}<ArrowDownRight size={17} /></a>
-              <a className="button button-outline" href="#contact"><MessageCircle size={16} />{t.contactSunil}</a>
+              <a className="button button-gold" href="#contact"><MessageCircle size={16} />{t.contactSunil}</a>
+              <a className="button button-outline" href="#categories">{t.viewPortfolio}<ArrowDownRight size={17} /></a>
             </div>
             <div className="hero-facts">
               <div><strong>14</strong><span>{language === "en" ? "Portfolio categories" : "पोर्टफोलियो कैटेगरी"}</span></div>
