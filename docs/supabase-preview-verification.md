@@ -181,3 +181,11 @@ Reviewed `src/App.tsx` and `src/data.ts` only; this is not a device/browser visu
 - [ ] Passing CI does not yet prove the new `media_upload_cleanup_pending` failure branch; an injected cleanup-failure regression test remains open.
 - [ ] A dedicated safe media-delete endpoint and live Storage verification remain incomplete. Storage verification stays blocked under the explicit service-role-key hold.
 - [ ] No PR was merged and no Production D1, secret, schema, or live Storage write was changed.
+
+## Follow-up CI verification (2026-11-01, commit 90a929c)
+
+- GitHub Actions run [#474](https://github.com/pkdiv6548/Photography/actions/runs/41266140274) completed successfully for commit `90a929caac8fd62ec13e0ec2e984284293ffb49f`.
+- All nine main job steps passed, including dependency installation, frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture, fresh-schema Worker contract fixture, and frontend production build.
+- Added `tests/media-upload-compensation.test.ts` to cover the failure path where Storage upload succeeds but the D1 media-record batch fails: successful Storage cleanup releases the reserved quota; failed Storage cleanup returns `media_upload_cleanup_pending` and retains the reservation.
+- These tests use mocked Storage responses and a fake D1 binding. They do not verify real Supabase credentials, live object operations, or Production schema compatibility.
+- Preview secret setup remains explicitly on hold. Do not run live Storage tests, modify secrets, change Production configuration/data, or merge PR #87 until the user explicitly resumes the held secret task and all schema/rollout gates are satisfied.
