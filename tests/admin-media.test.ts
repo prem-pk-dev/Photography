@@ -142,3 +142,37 @@ test("media upload rejects a file whose bytes do not match its declared image MI
   assert.equal(response.status, 415);
   assert.deepEqual(await response.json(), { error: "file_signature_mismatch" });
 });
+
+test("owner cannot hide media that is currently the project's cover image", async () => {
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT m.preview_url, p.cover_image_url FROM project_media")) {
+            return { preview_url: "/api/media/projects/p/m.jpg", cover_image_url: "/api/media/projects/p/m.jpg" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media/hide", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ id: "cover-media-id" }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), { error: "replace_cover_before_hiding" });
+});
