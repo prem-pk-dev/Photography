@@ -1534,8 +1534,10 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       if (current && !job && !current.original_key) {
         // External media has no object owned by this Storage bucket: database-only delete.
         const result = await env.DB.batch([
-          env.DB.prepare("DELETE FROM project_media WHERE id = ? AND project_id = ? AND original_key IS NULL")
-            .bind(id, current.project_id),
+          env.DB.prepare(
+            "DELETE FROM project_media WHERE id = ? AND project_id = ? AND original_key IS NULL " +
+            "AND NOT EXISTS (SELECT 1 FROM projects WHERE id = ? AND cover_image_url = project_media.preview_url)"
+          ).bind(id, current.project_id, current.project_id),
           env.DB.prepare(
             "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
             "SELECT ?, ?, 'media_deleted_external', 'media', ? WHERE NOT EXISTS (SELECT 1 FROM project_media WHERE id = ?)"
