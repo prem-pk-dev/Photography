@@ -510,7 +510,7 @@ async function handleCustomerAuth(request: Request, env: Env, url: URL): Promise
       ? request.method === "POST" : false;
   if (!methodAllowed) {
     const response = json({ error: "method_not_allowed" }, 405);
-    response.headers.set("Allow", path === "/api/customer/session" || path === "/api/customer/profile" ? "GET, PUT" : "POST");
+    response.headers.set("Allow", path === "/api/customer/session" ? "GET" : path === "/api/customer/profile" ? "GET, PUT" : "POST");
     return response;
   }
   if (!env.DB) return json({ error: "database_not_configured" }, 503);
