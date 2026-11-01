@@ -40,3 +40,14 @@ jobs:
           set -euo pipefail
           response="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 "$PREVIEW_BASE_URL/api/health")"
           echo "$response" | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; const body=JSON.parse(s); if(body.status!=="ok" || body.service!=="golden-films-api") { console.error(body); process.exit(1); } console.log("Deployed preview health check passed:", JSON.stringify(body));'
+      - name: Smoke-test deployed preview readiness endpoint
+        env:
+          PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
+        run: |
+          set -euo pipefail
+          response="$(curl --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --write-out '\\n%{http_code}' "$PREVIEW_BASE_URL/api/ready")"
+          body="$(printf '%s' "$response" | sed '$d')"
+          status="$(printf '%s' "$response" | tail -n 1)"
+          echo "Readiness HTTP status: $status"
+          echo "$body" | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; let body; try { body=JSON.parse(s); } catch { console.error("Readiness endpoint did not return JSON:", s); process.exit(1); } console.log("Deployed preview readiness response:", JSON.stringify(body)); if(body.status!=="ready" || body.schema!=="legacy-compatible" || body.supabaseStorageConfigured!==true) process.exit(1);'
+          test "$status" = "200"
