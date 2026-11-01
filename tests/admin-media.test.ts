@@ -435,11 +435,11 @@ test("editor cannot create public media and no database write occurs", async () 
 });
 
 test("editor can create private draft media with an audit entry", async () => {
-  const executed: string[] = [];
+  const executed: Array<{ query: string; args: unknown[] }> = [];
   const db = {
     prepare(query: string) {
       return {
-        bind(..._args: unknown[]) { return this; },
+        bind(...args: unknown[]) { (this as any).args = args; return this; },
         async first<T>() {
           if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
             return { id: "editor-id", email: "editor@example.test", role: "editor" } as T;
@@ -450,7 +450,7 @@ test("editor can create private draft media with an audit entry", async () => {
           return null as T | null;
         },
         async run() {
-          executed.push(query);
+          executed.push({ query, args: (this as any).args ?? [] });
           return { success: true, meta: { changes: 1 } };
         },
         async all<T>() { return { success: true, results: [] as T[] }; },
@@ -481,6 +481,6 @@ test("editor can create private draft media with an audit entry", async () => {
   assert.equal(body.ok, true);
   assert.equal(body.isPublic, false);
   assert.ok(body.id);
-  assert.ok(executed.some((query) => query.includes("INSERT INTO project_media")));
-  assert.ok(executed.some((query) => query.includes("'media_added_draft'")));
+  assert.ok(executed.some((entry) => entry.query.includes("INSERT INTO project_media")));
+  assert.ok(executed.some((entry) => entry.query.includes("INSERT INTO audit_logs") && entry.args.includes("media_added_draft")));
 });
