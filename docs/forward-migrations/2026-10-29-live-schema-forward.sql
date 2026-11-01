@@ -12,6 +12,29 @@
 -- The live catalog audit found no foreign keys referencing enquiries and one explicit
 -- status/created_at index; this migration recreates that index after the rebuild.
 
+-- Worker project writes require both language and locale, while the live table
+-- only has locale. Rebuild the table while preserving every existing translation.
+-- Map language from locale (en/hi), and retain the exact UNIQUE conflict target
+-- used by Worker upserts: (project_id, locale).
+CREATE TABLE project_translations_new (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  language TEXT NOT NULL CHECK (language IN ('en','hi')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  alt_text TEXT NOT NULL DEFAULT '',
+  locale TEXT NOT NULL CHECK (locale IN ('en','hi')),
+  PRIMARY KEY (project_id, language)
+);
+
+INSERT INTO project_translations_new (project_id, language, title, description, alt_text, locale)
+SELECT project_id, locale, title, description, '', locale
+FROM project_translations;
+
+DROP TABLE project_translations;
+ALTER TABLE project_translations_new RENAME TO project_translations;
+CREATE UNIQUE INDEX idx_project_translations_project_locale
+  ON project_translations(project_id, locale);
+
 CREATE TABLE enquiries_new (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
