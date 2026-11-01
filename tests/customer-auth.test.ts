@@ -296,6 +296,35 @@ test("customer session rejects an invalid session cookie", async () => {
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
 
+test("customer logout clears oversized session cookies without querying by token", async () => {
+  let deleteQueries = 0;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() {
+          if (query.includes("DELETE FROM customer_sessions")) deleteQueries += 1;
+          return { success: true, meta: { changes: 0 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const oversizedToken = "x".repeat(257);
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/logout", {
+      method: "POST",
+      headers: { cookie: "__Host-gf_customer=" + oversizedToken },
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  assert.equal(deleteQueries, 0, "oversized token must not be hashed or queried");
+});
+
 test("customer logout clears a stale or invalid session cookie", async () => {
   const db = {
     prepare(_query: string) {
