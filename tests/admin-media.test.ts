@@ -661,3 +661,56 @@ test("owner replacing current cover media updates the cover URL and records the 
   assert.equal(coverUpdate.args[2], "https://cdn.example.test/old-cover.jpg");
   assert.ok(executed.some(entry => entry.query.includes("'media_replaced'")));
 });
+
+test("owner can create public media and writes a public-media audit entry", async () => {
+  const executed: Array<{ query: string; args: unknown[] }> = [];
+  const db = {
+    prepare(query: string) {
+      let args: unknown[] = [];
+      return {
+        bind(...values: unknown[]) { args = values; return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) {
+            return { id: "owner-id", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("SELECT id FROM projects WHERE id = ?")) {
+            return { id: "project-id" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          executed.push({ query, args });
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://example.test/api/admin/projects/media", {
+      method: "POST",
+      headers: {
+        cookie: "__Host-gf_admin=valid-test-session",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        projectId: "project-id",
+        mediaType: "image",
+        previewUrl: "https://cdn.example.test/public-owner-image.jpg",
+        altEn: "Published image",
+        altHi: "प्रकाशित तस्वीर",
+        sortOrder: 1,
+        isPublic: true,
+      }),
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 201);
+  const body = await response.json() as { ok: boolean; id: string; isPublic: boolean };
+  assert.equal(body.ok, true);
+  assert.equal(body.isPublic, true);
+  const insert = executed.find(entry => entry.query.includes("INSERT INTO project_media"));
+  assert.ok(insert);
+  assert.equal(insert.args[insert.args.length - 1], 1);
+  assert.ok(executed.some(entry => entry.query.includes("'media_added_public'")));
+});
