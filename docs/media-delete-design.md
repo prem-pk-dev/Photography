@@ -61,3 +61,10 @@ Do not add a schema change to Production until backup/restore gates pass. The le
 - [ ] Verify live upload/read/delete with a disposable Preview object only, after confirming configured Preview credentials without exposing secrets.
 - [ ] Review Production D1 backup artifact on PC; verify restore procedure before any Production schema/data change.
 - [ ] Keep PR #87 and PR #63 unmerged until all relevant release gates are satisfied.
+
+## Storage API contract review (2026-11-01)
+
+- Reviewed the official Supabase Storage delete documentation and current `storage-js` implementation. The supported bulk-delete route is `DELETE /storage/v1/object/{bucketName}` with JSON body `{ prefixes: [objectPath] }`; the SDK's `remove(paths)` method uses this shape. Sources: https://supabase.com/docs/guides/storage/management/delete-objects and https://github.com/supabase/storage-js/blob/main/src/packages/StorageFileApi.ts.
+- The current Worker helper uses that endpoint/body shape. This confirms the request contract at source level, but does not verify that this project's configured key, bucket, object key, and runtime permissions work. A disposable Preview object test is still required before release.
+- Supabase explicitly says to delete objects through the Storage API rather than deleting Storage metadata through SQL; SQL deletion can orphan the underlying object. Source: https://supabase.com/docs/guides/storage/management/delete-objects.
+- Remaining implementation gates are unchanged: durable cleanup ledger/retry, exact-key validation, owner/cover safeguards, failure-injection tests, and isolated Preview runtime verification.
