@@ -56,6 +56,7 @@ with tempfile.TemporaryDirectory() as tmp:
         ("long-error", "media-5", "project-1", "valid/key.jpg", "failed", 1, "x" * 81),
     ]
     for jid, mid, pid, key, status, attempts, error in invalid_cases:
+        db.execute("SAVEPOINT invalid_case")
         try:
             db.execute(
                 """INSERT INTO gf_media_cleanup_jobs
@@ -64,8 +65,11 @@ with tempfile.TemporaryDirectory() as tmp:
                 (jid, mid, pid, key, status, attempts, error),
             )
         except sqlite3.IntegrityError:
-            db.rollback()
+            db.execute("ROLLBACK TO invalid_case")
+            db.execute("RELEASE invalid_case")
         else:
+            db.execute("ROLLBACK TO invalid_case")
+            db.execute("RELEASE invalid_case")
             raise AssertionError(f"constraint failed to reject invalid case: {jid}")
 
     db.execute(
