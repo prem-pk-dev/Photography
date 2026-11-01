@@ -1275,50 +1275,57 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       if (existing?.status === "published" && admin.role !== "owner") return json({ error: "forbidden" }, 403);
       const category = await env.DB.prepare("SELECT id, slug FROM categories WHERE slug = ?").bind(categorySlug).first<{ id: string; slug: string }>();
       if (!category) return json({ error: "invalid_category" }, 400);
-      const projectId = crypto.randomUUID();
+      // Reuse an existing row's ID on slug upsert, otherwise create it now so
+      // project + bilingual translations + audit can be committed in one D1 batch.
+      const projectId = existing?.id ?? crypto.randomUUID();
       const projectColumns = await env.DB.prepare("PRAGMA table_info(projects)").all<{ name: string }>();
       const projectColumnNames = new Set((projectColumns.results ?? []).map(column => column.name));
-      let project: { id: string } | null;
+      let projectStatement: D1PreparedStatement;
       if (projectColumnNames.has("category_id") && projectColumnNames.has("cover_object_key") && projectColumnNames.has("featured")) {
         // Legacy live D1 schema: preserve its required columns as well as the
         // newer API-facing compatibility columns.
         const coverObjectKey = coverImageUrl.startsWith("/api/media/projects/")
           ? coverImageUrl.slice("/api/media/".length)
           : "";
-        project = await env.DB.prepare(
+        projectStatement = env.DB.prepare(
           "INSERT INTO projects (id, slug, category_id, cover_object_key, category_slug, cover_image_url, status, featured, is_featured, location, project_date, demo_label, updated_at) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
           "ON CONFLICT(slug) DO UPDATE SET category_id = excluded.category_id, cover_object_key = excluded.cover_object_key, " +
           "category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, status = excluded.status, " +
           "featured = excluded.featured, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
-          "demo_label = excluded.demo_label, updated_at = datetime('now') RETURNING id"
+          "demo_label = excluded.demo_label, updated_at = datetime('now')"
         ).bind(projectId, slug, category.id, coverObjectKey, categorySlug, coverImageUrl, status,
-          body?.isFeatured === true ? 1 : 0, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
-          .first<{ id: string }>();
+          body?.isFeatured === true ? 1 : 0, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel);
       } else {
         // Forward-migrated schema where legacy required columns no longer exist.
-        project = await env.DB.prepare(
+        projectStatement = env.DB.prepare(
           "INSERT INTO projects (id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label, updated_at) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
           "ON CONFLICT(slug) DO UPDATE SET category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, " +
           "status = excluded.status, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
-          "demo_label = excluded.demo_label, updated_at = datetime('now') RETURNING id"
-        ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
-          .first<{ id: string }>();
+          "demo_label = excluded.demo_label, updated_at = datetime('now')"
+        ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel);
       }
-      if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'en', 'en', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleEn, descriptionEn).run();
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'hi', 'hi', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleHi, descriptionHi).run();
-      await env.DB.prepare(
-        "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'project', ?)"
-      ).bind(crypto.randomUUID(), admin.id, status === "published" ? "project_published" : "project_saved_draft", project.id).run();
-      return json({ ok: true, id: project.id, slug, status });
+      const statements = [
+        projectStatement,
+        env.DB.prepare(
+          "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'en', 'en', ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
+        ).bind(projectId, titleEn, descriptionEn),
+        env.DB.prepare(
+          "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'hi', 'hi', ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
+        ).bind(projectId, titleHi, descriptionHi),
+        env.DB.prepare(
+          "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'project', ?)"
+        ).bind(crypto.randomUUID(), admin.id, status === "published" ? "project_published" : "project_saved_draft", projectId),
+      ];
+      if (!env.DB.batch) return json({ error: "project_save_unavailable" }, 503);
+      const results = await env.DB.batch(statements);
+      if (!results || results.length !== statements.length || results.some(result => result.success === false)) {
+        return json({ error: "project_save_unavailable" }, 503);
+      }
+      return json({ ok: true, id: projectId, slug, status });
     } catch {
       return json({ error: "project_save_unavailable" }, 503);
     }
