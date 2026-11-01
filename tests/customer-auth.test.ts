@@ -80,3 +80,33 @@ test("customer registration accepts email addresses containing the letter s", as
   assert.equal(response.status, 201);
   assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
 });
+
+test("customer session and profile endpoints reject requests without a valid session", async () => {
+  const db = {
+    prepare(_query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const requests = [
+    new Request("https://example.test/api/customer/session", { method: "GET" }),
+    new Request("https://example.test/api/customer/profile", { method: "GET" }),
+    new Request("https://example.test/api/customer/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Unauthorized Update", phone: "123" }),
+    }),
+  ];
+
+  for (const request of requests) {
+    const response = await worker.fetch(request, { DB: db });
+    assert.equal(response.status, 401, `${request.method} ${new URL(request.url).pathname} must require a session`);
+    assert.deepEqual(await response.json(), { error: "unauthorized" });
+  }
+});
+
