@@ -67,7 +67,7 @@ function Login({signup=false}:{signup?:boolean}){
  try{const payload=signup?{name:String(data.get("name")||"").trim(),email:String(data.get("email")||"").trim(),phone:String(data.get("phone")||"").trim(),password:String(data.get("password")||"")}:{email:String(data.get("email")||"").trim(),password:String(data.get("password")||"")};
  const response=await fetch(signup?"/api/customer/register":"/api/customer/login",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(payload)});
  const result=await response.json() as {error?:string;customer?:{full_name?:string}};
- if(!response.ok)throw new Error(result.error||"auth_failed");go("/account");
+ if(!response.ok)throw new Error(result.error||"auth_failed");const requestedNext=new URLSearchParams(window.location.search).get("next");let destination="/account";if(requestedNext){try{const target=new URL(requestedNext,window.location.origin);if(target.origin===window.location.origin)destination=target.pathname+target.search+target.hash;}catch{destination="/account";}}go(destination);
  }catch(error){const code=error instanceof Error?error.message:"auth_failed";setMessage(code==="invalid_credentials"?"Email or password is incorrect.":code==="validation_failed"?"Check your details. Use a password with at least 12 characters.":code==="registration_unavailable_or_email_exists"?"Account could not be created. This email may already be registered. Try logging in.":"Customer authentication is temporarily unavailable. Please try again.");}
  finally{setBusy(false);}
  }
