@@ -284,3 +284,27 @@ test("customer session rejects an invalid session cookie", async () => {
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: "unauthorized" });
 });
+
+test("customer logout clears the session cookie when the session is invalid", async () => {
+  const db = {
+    prepare(_query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+
+  const response = await worker.fetch(
+    new Request("https://example.test/api/customer/logout", {
+      method: "POST",
+      headers: { cookie: "__Host-gf_customer=expired-or-invalid-token" },
+    }),
+    { DB: db },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "unauthorized" });
+});
