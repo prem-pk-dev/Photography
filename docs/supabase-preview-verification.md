@@ -252,6 +252,15 @@ Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` an
 
 
 
+## Booking enquiry persistence verification (source-reviewed 2026-11-02)
+
+The Worker implementation exposes these routes:
+
+- Public submission: `POST /api/enquiries` (also `POST /api/v1/enquiries`). On a valid request it inserts into D1 `enquiries` and returns HTTP 201 with `ok: true`; storage/schema failures should return an error instead of success.
+- Admin listing: `GET /api/admin/enquiries`, requires an authenticated admin session. It returns an `enquiries` array and status counts, or a schema/database error.
+
+**End-to-end acceptance check:** submit a fresh dummy enquiry in Preview, sign into the Preview Admin panel with the existing authorized test admin, open Enquiries, and confirm the dummy record appears. If the UI shows success but no record appears, capture only the error/status (hide name, email, phone, message, and enquiry ID) so the API/database path can be isolated. Do not use Production for write tests.
+
 ## Latest user-provided booking submission evidence (2026-11-02)
 
 - [x] User screenshot shows the booking enquiry form filled and a visible success message: `Enquiry received. Thank you.`
