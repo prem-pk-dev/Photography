@@ -252,6 +252,13 @@ Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` an
 
 
 
+## Latest user-provided booking submission evidence (2026-11-02)
+
+- [x] User screenshot shows the booking enquiry form filled and a visible success message: `Enquiry received. Thank you.`
+- [x] This confirms the UI entered its success state after submission in the viewed environment.
+- [ ] It does not by itself prove the enquiry was persisted in D1, appears in the Admin enquiries list, or triggers any notification.
+- [ ] Next verification: use a fresh dummy enquiry in Preview, then confirm it appears in the Admin panel (without exposing personal contact data). Avoid production writes during verification.
+
 ## Latest user-provided mobile booking UI evidence (2026-11-02)
 
 - [x] User screenshot confirms the homepage “Book a Shoot” button opens the booking enquiry section on a mobile viewport.
