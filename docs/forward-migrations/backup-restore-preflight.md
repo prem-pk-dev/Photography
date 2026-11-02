@@ -98,12 +98,12 @@ Read-only queries against Preview's configured disposable D1 database `golden-fi
 This check surfaced schema drift in the Preview fixture; align/reseed it through a reviewed disposable-only migration workflow before relying on it for runtime verification. No production data/configuration was changed.
 
 
-## Pages runtime binding verification (2026-11-02, latest)
+## Pages runtime binding verification (2026-11-02, corrected)
 
-Cloudflare's Pages project configuration endpoint was re-read directly. This is configuration metadata only; secret values were not read.
+Cloudflare's read-only Pages project configuration endpoint was rechecked after the owner confirmed that the Pages secrets and variables are configured correctly. The API returns secret-type entries with an empty `value` field; this is not sufficient evidence that the encrypted secret is missing or empty. No secret values were read.
 
-- **Production:** `production` has no D1 binding listed. Its runtime configuration lists `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, but does not list `SUPABASE_SERVICE_ROLE_KEY` or `ADMIN_SETUP_SECRET`. The API bridge requires `DB`; media upload additionally requires the Supabase service-role key; initial admin setup requires the setup secret. As currently configured, those flows cannot be considered deploy-ready.
-- **Preview:** `DB` is bound to disposable D1 database `21f470cb-776a-4eb2-816e-16605139299a`. The configuration reports the secret variable entries for `SUPABASE_SERVICE_ROLE_KEY` and `ADMIN_SETUP_SECRET` with empty values, so they are not usable as configured. `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET=golden-films-media` are present.
-- The current Worker explicitly fails closed if required bindings/secrets are absent. No secrets were retrieved, printed, changed, or added. No Production setting was changed.
-- **Next gate:** the account owner must add `ADMIN_SETUP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` as encrypted secrets in the Cloudflare Pages Preview environment, then configure the Production equivalents and its intended D1 binding only after the database recovery/migration gate is cleared. Never put the service-role key in frontend code or plain-text variables.
-- The latest Preview deployment `0db4bf36.golden-films.pages.dev` completed successfully, but a successful static deployment is not proof that the API or media runtime works. Keep PRs in Draft pending runtime verification.
+- **Preview:** `DB` is bound to disposable D1 database `21f470cb-776a-4eb2-816e-16605139299a`. The API lists `ADMIN_SETUP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` as `secret_text`, but their values are not observable through this read-only response. Owner reports secrets and variables are correctly configured; runtime behavior still needs a real request/test to verify.
+- **Production:** the configuration response does not list a D1 binding. The media backend and API bridge depend on `DB`; verify whether the production binding is intentionally deferred until the database recovery/migration gate is cleared. Do not add or change a Production binding before that gate is approved.
+- A direct HTTP probe of `/api/health` and `/api/ready` from the Cloudflare tool execution environment was blocked by that environment's outbound-request policy (HTTP 403: requests not allowed). This does **not** establish that the endpoints are down or that secrets are invalid.
+- No secrets were retrieved, printed, changed, or added. No Production setting or data was changed.
+- The latest Preview deployment `0db4bf36.golden-films.pages.dev` completed successfully, but deployment success alone does not verify API/media runtime behavior. Keep PRs in Draft pending runtime verification and the actual-export restore gate.
