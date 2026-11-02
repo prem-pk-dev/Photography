@@ -96,3 +96,14 @@ Read-only queries against Preview's configured disposable D1 database `golden-fi
 - A combined column-check query exceeded SQLite's compound SELECT limit, so it was split into individual read-only queries. No rows were written.
 
 This check surfaced schema drift in the Preview fixture; align/reseed it through a reviewed disposable-only migration workflow before relying on it for runtime verification. No production data/configuration was changed.
+
+
+## Pages runtime binding verification (2026-11-02, latest)
+
+Cloudflare's Pages project configuration endpoint was re-read directly. This is configuration metadata only; secret values were not read.
+
+- **Production:** `production` has no D1 binding listed. Its runtime configuration lists `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, but does not list `SUPABASE_SERVICE_ROLE_KEY` or `ADMIN_SETUP_SECRET`. The API bridge requires `DB`; media upload additionally requires the Supabase service-role key; initial admin setup requires the setup secret. As currently configured, those flows cannot be considered deploy-ready.
+- **Preview:** `DB` is bound to disposable D1 database `21f470cb-776a-4eb2-816e-16605139299a`. The configuration reports the secret variable entries for `SUPABASE_SERVICE_ROLE_KEY` and `ADMIN_SETUP_SECRET` with empty values, so they are not usable as configured. `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET=golden-films-media` are present.
+- The current Worker explicitly fails closed if required bindings/secrets are absent. No secrets were retrieved, printed, changed, or added. No Production setting was changed.
+- **Next gate:** the account owner must add `ADMIN_SETUP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` as encrypted secrets in the Cloudflare Pages Preview environment, then configure the Production equivalents and its intended D1 binding only after the database recovery/migration gate is cleared. Never put the service-role key in frontend code or plain-text variables.
+- The latest Preview deployment `0db4bf36.golden-films.pages.dev` completed successfully, but a successful static deployment is not proof that the API or media runtime works. Keep PRs in Draft pending runtime verification.
