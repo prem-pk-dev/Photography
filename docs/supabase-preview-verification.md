@@ -218,3 +218,35 @@ Reviewed `src/App.tsx` and `src/data.ts` only; this is not a device/browser visu
 - [ ] **Historical note clarification:** earlier entries in this document record older configuration snapshots and blocked direct probes. Treat those as historical evidence for their stated dates; this newer CI result supersedes only the older CI status, not the unresolved live Storage and Production backup gates.
 - [ ] Keep PR #87 and PR #63 unmerged pending explicit release authorization and completion of the Production backup/schema verification gates.
 
+## Worker SQL contract audit (2026-11-02, source-level)
+
+Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` and inventoried SQL table dependencies and explicit readiness checks. This completes the **source-level portion of BE-06**; it is not a claim that every query has been executed against a restored Production schema.
+
+### Table dependency inventory
+
+- [x] Authentication and authorization: `admin_users`, `admin_sessions`, `admin_setup`, `auth_rate_limits`, `audit_logs`.
+- [x] Enquiry intake and abuse controls: `enquiries`, `enquiry_rate_limits`.
+- [x] Portfolio and media: `projects`, `categories`, `project_media`, `project_translations`.
+- [x] CMS/revisions: `site_content`, `site_content_revisions`.
+- [x] Upload quota and durable delete retry: `gf_monthly_media_usage`, `gf_media_cleanup_jobs`.
+- [x] Additional customer-facing handlers reference `customer_users` and `customer_sessions`; these tables also need inclusion in a complete migration/Production schema comparison if those routes are in scope.
+
+### Explicit Worker schema contract signals
+
+- `admin_users` must provide `id`, `email`, `password_hash`, `password_salt`, `role`, `is_active`, `created_at`, and `last_login_at` across authentication, user-management, and status queries.
+- `admin_sessions` must support `token_hash`, `admin_user_id`, and `expires_at`; authentication joins it to active admin users.
+- `enquiries` readiness explicitly requires `id`, `name`, `email`, `phone`, `service`, `consent`, `status`, `created_at`, and `updated_at`, plus the `enquiry_rate_limits` table.
+- Portfolio readiness explicitly requires `projects(id, slug, category_slug, cover_image_url, status, is_featured)` and `categories(id, slug, title_en, title_hi)`.
+- CMS readiness requires both `site_content` and `site_content_revisions`.
+- Monthly quota logic writes `gf_monthly_media_usage(month_key, used_bytes)`; the current schema fixture also covers `updated_at`.
+- Media deletion expects `gf_media_cleanup_jobs` to persist a job ID, media/project IDs, storage key, status, attempt count, error code, timestamps, and completion timestamp. The exact live schema must be compared with migration `0101_gf_media_cleanup_jobs.sql` and the fixture before release.
+- Media queries depend on `project_media` fields including `id`, `project_id`, `media_type`, `preview_url`, `original_key`, `alt_en`, `alt_hi`, `sort_order`, and `is_public`; project media lifecycle also compares `projects.cover_image_url`.
+
+### Results and boundary
+
+- [x] The current branch's fresh-schema Worker contract fixture and forward-migration fixture passed in CI run [#724](https://github.com/pkdiv6548/Photography/actions/runs/41330647779).
+- [x] The Preview schema was previously inspected read-only and includes the known `admin_users.role`, `enquiries.consent`, CMS, quota, and media-cleanup objects; no Production changes were made.
+- [ ] **Still blocked:** execute the complete Worker query contract against a restored, verified Production export. No verified Production export artifact exists yet, so this must not be marked complete.
+- [ ] **Still blocked:** validate every referenced table/column and data-preservation behavior against that restored schema, then rehearse the forward migration on the disposable restore.
+- [ ] Do not apply migration SQL to Production, change Production bindings, merge either draft PR, or treat fixture success as proof of Production compatibility.
+
