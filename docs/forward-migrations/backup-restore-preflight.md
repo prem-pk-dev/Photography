@@ -54,3 +54,16 @@ The production database has a legacy schema that differs from the Worker contrac
 - The available execution environment attempted to fetch the temporary signed download URL but outbound network policy returned HTTP 403 (host not permitted). The SQL bytes were not downloaded; no SHA-256 or file-size validation is available. Do not claim a usable verified backup artifact.
 - After the export completed, a read-only Production query succeeded and returned 13 tables; the database metadata remained readable. No migration, import, or production data write was performed.
 - Next safe route: obtain the export bytes through an approved Cloudflare-native workflow that does not require the mobile-only owner to manually download/upload SQL. Until such a route is available, the actual-export restore and production compatibility gate remain blocked. Do not request repeated manual SQL downloads from the owner.
+
+
+## Follow-up verification (2026-11-02)
+
+- Read-only Cloudflare Pages project configuration rechecked: project `golden-films`, production branch `main`.
+- Production Pages configuration currently lists no D1 bindings and no plain-text variable names. Preview lists a `DB` binding to disposable database ID `21f470cb-776a-4eb2-816e-16605139299a`; this is the preview test DB, not Production.
+- Read-only catalog queries succeeded against three disposable databases:
+  - `golden-films-forward-migration-test-20261101`: 16 tables.
+  - `golden-films-migration-test-20261101`: 19 tables.
+  - `golden-films-preview-test`: 20 tables.
+- A direct `PRAGMA integrity_check` request was rejected by D1 with `SQLITE_AUTH`; no integrity-check pass is claimed from that command. Use supported SQL checks (including `PRAGMA foreign_key_check` only if the API permits it) and the repository's verifier script in an authorized test runner.
+- Browser/network probes of Production and Preview `/api/health` and `/api/ready` could not be completed by the available verification tools. Runtime health remains unverified, not proven broken.
+- No Pages configuration, secrets, or Production data were changed. Keep both PRs in Draft until export restore, API runtime checks, and rollout gates are completed.
