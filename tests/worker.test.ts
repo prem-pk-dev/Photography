@@ -1779,3 +1779,76 @@ test("media deletion rejects an authenticated editor before querying media or St
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("media deletion records a retryable cleanup failure when Supabase Storage rejects deletion", async () => {
+  const token = "owner-storage-failure-test-token";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  const mediaId = "media-failure-1";
+  const storageKey = `projects/${projectId}/original.jpg`;
+  let cleanupFailureRecorded = false;
+  let storageContacted = false;
+  const db = {
+    prepare(query: string) {
+      let values: unknown[] = [];
+      return {
+        bind(...args: unknown[]) { values = args; return this; },
+        async first<T>() {
+          if (query.includes("FROM admin_sessions s JOIN admin_users u")) {
+            assert.equal(values[0], tokenHash);
+            return { id: "owner-1", email: "owner@example.test", role: "owner" } as T;
+          }
+          if (query.includes("FROM project_media m JOIN projects p")) {
+            return { id: mediaId, project_id: projectId, preview_url: "https://cdn.example.test/preview.jpg",
+              original_key: storageKey, cover_image_url: "https://cdn.example.test/other-cover.jpg" } as T;
+          }
+          if (query.includes("status IN ('pending', 'failed')")) return null as T | null;
+          if (query.includes("FROM gf_media_cleanup_jobs WHERE id = ?")) {
+            return { id: "cleanup-job-1", media_id: mediaId, project_id: projectId,
+              storage_key: storageKey, status: "pending" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          if (query.includes("UPDATE gf_media_cleanup_jobs SET status = 'failed'")) {
+            cleanupFailureRecorded = values[0] === "supabase_storage_delete_failed_500";
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+    async batch() { return [{ success: true, meta: { changes: 1 } }]; },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    storageContacted = true;
+    return new Response("storage unavailable", { status: 500 });
+  }) as typeof fetch;
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/projects/media/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "__Host-gf_admin=" + token,
+        },
+        body: JSON.stringify({ id: mediaId }),
+      }),
+      {
+        DB: db,
+        SUPABASE_URL: "https://photography-test.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "server-only-test-secret",
+        SUPABASE_STORAGE_BUCKET: "golden-films-media",
+      } as never,
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "media_delete_cleanup_pending", retryable: true });
+    assert.equal(storageContacted, true, "owner deletion should attempt Storage cleanup");
+    assert.equal(cleanupFailureRecorded, true, "failed Storage deletion should be recorded for retry");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
