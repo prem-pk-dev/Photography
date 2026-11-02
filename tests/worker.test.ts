@@ -161,6 +161,16 @@ test("readiness endpoint rejects a schema missing the enquiry consent column", a
   const response = await worker.fetch(new Request("https://example.test/api/ready"), { DB: db });
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: "database_schema_incompatible" });
+
+  // After restoring consent, readiness must also reject missing core enquiry fields.
+  schema.enquiries.push("consent");
+  for (const requiredColumn of ["email", "status", "updated_at"]) {
+    schema.enquiries = schema.enquiries.filter(name => name !== requiredColumn);
+    const missingColumnResponse = await worker.fetch(new Request("https://example.test/api/ready"), { DB: db });
+    assert.equal(missingColumnResponse.status, 503, "readiness must reject missing enquiries." + requiredColumn);
+    assert.deepEqual(await missingColumnResponse.json(), { error: "database_schema_incompatible" });
+    schema.enquiries.push(requiredColumn);
+  }
 });
 
 test("requests from an unexpected origin are rejected", async () => {
