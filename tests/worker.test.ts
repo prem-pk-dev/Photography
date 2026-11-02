@@ -1688,3 +1688,94 @@ test("public CMS endpoint rejects unknown page slugs before database access", as
   assert.deepEqual(await response.json(), { error: "invalid_page" });
   assert.equal(databaseContacted, false);
 });
+
+
+test("media deletion rejects unauthenticated requests before querying media or Storage", async () => {
+  let mediaQueryAttempted = false;
+  const db = {
+    prepare(query: string) {
+      if (query.includes("FROM project_media m JOIN projects")) mediaQueryAttempted = true;
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const originalFetch = globalThis.fetch;
+  let storageContacted = false;
+  globalThis.fetch = (async () => {
+    storageContacted = true;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/projects/media/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "media-123" }),
+      }),
+      { DB: db },
+    );
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "unauthorized" });
+    assert.equal(mediaQueryAttempted, false);
+    assert.equal(storageContacted, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("media deletion rejects an authenticated editor before querying media or Storage", async () => {
+  const token = "editor-session-test-token";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  let mediaQueryAttempted = false;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(...args: unknown[]) {
+          if (query.includes("FROM admin_sessions s JOIN admin_users u")) {
+            assert.equal(args[0], tokenHash);
+          }
+          if (query.includes("FROM project_media m JOIN projects")) mediaQueryAttempted = true;
+          return this;
+        },
+        async first<T>() {
+          if (query.includes("FROM admin_sessions s JOIN admin_users u")) {
+            return { id: "editor-1", email: "editor@example.test", role: "editor" } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+  };
+  const originalFetch = globalThis.fetch;
+  let storageContacted = false;
+  globalThis.fetch = (async () => {
+    storageContacted = true;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  try {
+    const response = await worker.fetch(
+      new Request("https://example.test/api/admin/projects/media/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "__Host-gf_admin=" + token,
+        },
+        body: JSON.stringify({ id: "media-123" }),
+      }),
+      { DB: db },
+    );
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "forbidden" });
+    assert.equal(mediaQueryAttempted, false);
+    assert.equal(storageContacted, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
