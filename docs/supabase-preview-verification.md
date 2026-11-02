@@ -1,3 +1,11 @@
+## Latest user-provided Admin login blocker (2026-11-02)
+
+- [x] Screenshot from `golden-films.pages.dev` shows the Admin sign-in page with the explicit message: `Admin service is not connected to a database yet.`
+- [x] This is a database/API wiring blocker, not evidence of a wrong password. Do not keep retrying credentials or request the user's password.
+- [x] The prior `/api/ready` screenshot was from the Preview deployment and reported ready; it does not establish that the Production `golden-films.pages.dev` deployment has a working D1 binding/API bridge. These are separate deployment environments.
+- [ ] Verify Production API routing and D1 binding against the actual deployed environment, without exposing secrets or changing Production schema/data.
+- [ ] Production's legacy D1 schema and backup/restore gate still block a safe database migration. Keep PRs Draft until wiring, schema compatibility, and recovery gates are verified.
+
 # Supabase Storage Preview Verification Runbook
 
 Use this checklist only in the **Preview** environment and a test admin account. Do not run write tests against Production until the Production D1 schema and binding are repaired and a backup is verified.
