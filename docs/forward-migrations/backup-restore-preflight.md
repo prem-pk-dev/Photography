@@ -45,3 +45,12 @@ The production database has a legacy schema that differs from the Worker contrac
 - A separate disposable D1 database, `golden-films-forward-migration-test-20261101` (`b276f110-c3a4-448a-8950-824497b43438`), was created and seeded with a **synthetic legacy-schema fixture** (one sample admin, category, project, two translations and enquiry; no production rows). The exact candidate forward migration ran successfully on this fixture.
 - Post-migration fixture checks passed: translation row count preserved (2), enquiry count preserved (1), admin count preserved (1); nullable `enquiries.email`; `consent INTEGER NOT NULL DEFAULT 0`; `admin_users.role TEXT NOT NULL DEFAULT 'editor'`; CMS and monthly quota tables present; translation conflict-target unique index present; project/translation/media orphan checks returned zero; translation locale/language and admin-role domain checks returned zero violations; `pragma_foreign_key_check` returned zero rows.
 - This is useful compatibility evidence, **not a verified restore of the actual Production export**. Production schema/data have not been changed. Task 3 remains blocked until the actual export is downloaded and restored into a disposable D1 database, then the migration and checks are run against that restored copy.
+
+
+## Current result (updated 2026-11-02, latest maintenance-window run)
+
+- Owner explicitly approved starting the maintenance-window export in chat on 2026-11-02.
+- Cloudflare D1 export for `golden-films-db` completed successfully at bookmark `00000060-00000000-00005117-9836ef61dc03d15521537e15d5aa6079`; export filename: `0241231b-6e6c-410b-a5ac-958eeb424a78-00000060-00000000-00005117-9836ef61dc03d15521537e15d5aa6079.sql`.
+- The available execution environment attempted to fetch the temporary signed download URL but outbound network policy returned HTTP 403 (host not permitted). The SQL bytes were not downloaded; no SHA-256 or file-size validation is available. Do not claim a usable verified backup artifact.
+- After the export completed, a read-only Production query succeeded and returned 13 tables; the database metadata remained readable. No migration, import, or production data write was performed.
+- Next safe route: obtain the export bytes through an approved Cloudflare-native workflow that does not require the mobile-only owner to manually download/upload SQL. Until such a route is available, the actual-export restore and production compatibility gate remain blocked. Do not request repeated manual SQL downloads from the owner.
