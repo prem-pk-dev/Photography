@@ -1,3 +1,11 @@
+## Production Admin blocker update (2026-11-02, Cloudflare config recheck)
+
+- [x] Read-only inspection of the Cloudflare Pages project showed Production deployment configuration had no `DB` binding, while Preview had a `DB` binding to the disposable preview D1 database.
+- [x] Added Production `DB` binding to the existing `golden-films-db` database ID `0241231b-6e6c-410b-a5ac-958eeb424a78`; re-read the Pages project and verified the binding is now present. This changed deployment configuration only; no D1 table/row writes or migrations were performed.
+- [ ] The currently deployed Production Worker may not use the new binding until a fresh deployment is created. Runtime behavior has not yet been verified.
+- [ ] Production config metadata currently lists only `SUPABASE_STORAGE_BUCKET` and `SUPABASE_URL` as environment-variable names; unlike Preview, it did not list `ADMIN_SETUP_SECRET` or `SUPABASE_SERVICE_ROLE_KEY`. Secret values are never readable from this metadata, so do not infer values; confirm the required Production secrets are configured in Cloudflare before deploying. Do not copy, print, or request secret values in chat.
+- [ ] Production D1 schema is legacy/drifted and no verified downloadable backup exists; do not run migrations or alter table/row data.
+
 ## Latest user-provided Admin login blocker (2026-11-02)
 
 - [x] Screenshot from `golden-films.pages.dev` shows the Admin sign-in page with the explicit message: `Admin service is not connected to a database yet.`
