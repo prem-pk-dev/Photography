@@ -252,6 +252,13 @@ Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` an
 
 
 
+## Latest user-provided mobile booking UI evidence (2026-11-02)
+
+- [x] User screenshot confirms the homepage “Book a Shoot” button opens the booking enquiry section on a mobile viewport.
+- [x] Visible fields include full name, email address, phone number, and service selection; the form layout is readable in the supplied screenshot.
+- [ ] Submission outcome has not yet been verified. Use non-sensitive test details in Preview and confirm the success/error response; do not send real customer data or test against Production during verification.
+- [ ] This visual check does not verify persistence, notification delivery, validation edge cases, or end-to-end booking completion.
+
 ## Latest user-provided Preview readiness evidence (2026-11-02)
 
 - [x] Screenshot of Preview `/api/ready` shows `status: ready`, `schema: legacy-compatible`, `adminSetupSecretConfigured: true`, `supabaseStorageConfigured: true`, `supabaseStorageEnvPresence.url/serviceRoleKey/bucket: true`, `mediaStatus: ready`, `adminSetupComplete: true`, `adminCount: 1`, and `blockers: []`.
