@@ -483,21 +483,62 @@ function AboutContentPage() {
 function ServicesContentPage() {
   const content = usePublishedPageContent("services");
   const language = getSiteLanguage();
-  const offers = [
+  const offers = language === "hi" ? [
+    { Icon: Camera, title: "फोटोग्राफी", description: "शादी, प्री-वेडिंग, पोर्ट्रेट, कार्यक्रम, फैशन और उत्पादों की फोटोग्राफी।", details: ["कहानी के अनुसार कवरेज और शॉट प्लानिंग","पोर्ट्रेट, बारीकियाँ और स्वाभाविक पल","संपादित हाई-रिज़ॉल्यूशन तस्वीरों का चयन"], fit:"लोग, समारोह, उत्पाद और ब्रांड" },
+    { Icon: Film, title: "वीडियोग्राफी", description: "सिनेमैटिक वेडिंग फिल्में, कार्यक्रम और ब्रांड की कहानियाँ।", details: ["कवरेज प्लान और महत्वपूर्ण पल","कहानी पर केंद्रित वीडियो रिकॉर्डिंग","एडिटिंग के लिए व्यवस्थित मीडिया"], fit:"कार्यक्रम, समारोह और प्रचार सामग्री" },
+    { Icon: WandSparkles, title: "फोटो एडिटिंग", description: "रीटचिंग, रंग सुधार और क्रिएटिव फिनिशिंग।", details: ["एक्सपोज़र और रंगों में एकरूपता","ध्यानपूर्वक पोर्ट्रेट रीटचिंग","उपयोग के अनुसार एक्सपोर्ट आकार"], fit:"फोटोग्राफर, क्रिएटर और व्यवसाय" },
+    { Icon: Clapperboard, title: "वीडियो एडिटिंग", description: "सिनेमैटिक कट, कलर ग्रेडिंग, रील्स और छोटे वीडियो।", details: ["कहानी के अनुसार कट और गति","रंग और ऑडियो में सुधार","सोशल मीडिया, वेब और प्रेज़ेंटेशन के लिए एक्सपोर्ट"], fit:"क्रिएटर, कार्यक्रम और ब्रांड संचार" }
+  ] : [
     { Icon: Camera, title: "Photography", description: "Weddings, pre-weddings, portraits, events, fashion and products.", details: ["Story-led coverage and shot planning","Portraits, details and candid moments","Edited high-resolution image selection"], fit:"People, celebrations, products and brands" },
     { Icon: Film, title: "Videography", description: "Cinematic wedding films, events and brand stories.", details: ["Coverage plan and key moments","Story-focused footage capture","Edit-ready organised media"], fit:"Events, celebrations and promotional stories" },
     { Icon: WandSparkles, title: "Photo editing", description: "Retouching, colour correction and creative finishing.", details: ["Exposure and colour consistency","Careful portrait retouching","Export sizes matched to usage"], fit:"Photographers, creators and businesses" },
     { Icon: Clapperboard, title: "Video editing", description: "Cinematic cuts, colour grading, reels and short-form edits.", details: ["Story assembly and pacing","Colour and audio refinement","Social, web and presentation exports"], fit:"Creators, events and brand communications" }
   ];
+  const process = language === "hi" ? [
+    ["01","समझना","आपके लक्ष्य, तारीख, दर्शकों और पसंदीदा शैली पर चर्चा।"],
+    ["02","योजना","काम का विवरण, समय-सारणी, कवरेज और डिलीवरी तय करना।"],
+    ["03","निर्माण","तय दायरे के अनुसार शूटिंग या एडिटिंग करना।"],
+    ["04","समीक्षा","आप चुने गए काम की समीक्षा करके एक साथ सुझाव साझा करें।"],
+    ["05","डिलीवरी","तय माध्यमों और उपयोग के लिए अंतिम फाइलें तैयार करना।"]
+  ] : [
+    ["01","Discover","We discuss your goals, date, audience and style."],
+    ["02","Plan","We align the brief, schedule, coverage and outputs."],
+    ["03","Create","The work is captured or edited against the agreed scope."],
+    ["04","Review","You review the agreed selection and share consolidated feedback."],
+    ["05","Deliver","Final files are prepared for the agreed channels and use."]
+  ];
+  const deliverables = language === "hi" ? [
+    ["संपादित फोटो गैलरी","तय आकार और फ़ॉर्मेट में चुनी गई तस्वीरें।"],
+    ["फिल्म या हाइलाइट एडिट","ब्रीफ और उपलब्ध फुटेज के आधार पर तैयार की गई कहानी।"],
+    ["सोशल मीडिया के छोटे वीडियो","काम के दायरे में शामिल होने पर वर्टिकल और छोटे संस्करण।"],
+    ["रीटचिंग और फिनिशिंग","रंगों में एकरूपता, सुधार और उचित एक्सपोर्ट गुणवत्ता।"]
+  ] : [
+    ["Edited image gallery","Selected images delivered in agreed dimensions and formats."],
+    ["Film or highlight edit","A narrative edit shaped around the brief and available footage."],
+    ["Social cut-downs","Vertical and short-form versions when included in scope."],
+    ["Retouching and finishing","Consistent colour, cleanup and export quality."]
+  ];
+  const faqs = language === "hi" ? [
+    ["प्रोजेक्ट की कीमत कितनी होगी?","कीमत काम के दायरे, घंटों, स्थान, डिलीवरी और एडिटिंग की ज़रूरतों पर निर्भर करती है। अपने काम का विवरण भेजकर अनुमान माँगें।"],
+    ["क्या मैं अपनी पसंद की शैली बता सकता हूँ?","हाँ—काम शुरू होने से पहले अपेक्षाएँ तय करने के लिए संदर्भ तस्वीरें या लिंक साझा करें।"],
+    ["क्या वेबसाइट की सभी तस्वीरें वास्तविक क्लाइंट प्रोजेक्ट हैं?","नहीं। सत्यापित और स्वीकृत काम मिलने तक नमूना विज़ुअल्स को डेमो के रूप में चिह्नित किया गया है।"],
+    ["क्या आप मेरे पास मौजूद फुटेज एडिट कर सकते हैं?","हाँ, उपलब्ध फाइलों की मात्रा, फ़ॉर्मेट और अपेक्षित परिणाम की जानकारी देकर एडिटिंग के बारे में चर्चा कर सकते हैं।"]
+  ] : [
+    ["How much does a project cost?","Pricing depends on scope, hours, location, deliverables and editing requirements; request a quote for your brief."],
+    ["Can I request a particular style?","Yes—share reference images or links so expectations can be discussed before production."],
+    ["Are all images on this site client projects?","No. Sample visuals are marked as demo until verified work is supplied and approved."],
+    ["Can you edit footage I already have?","Editing-only requests can be discussed with details about file volume, format and desired output."]
+  ];
+  const contactHref = "/contact" + (language === "hi" ? "?lang=hi" : "");
   return <SiteFrame eyebrow="WHAT WE CREATE" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "हमारी क्रिएटिव सेवाएँ" : "Creative Services")}>
     <p className="section-subtitle">{(language === "hi" ? content.introHi : content.introEn) || (language === "hi" ? "खास पलों और ब्रांड्स के लिए फोटोग्राफी, फिल्ममेकिंग और एडिटिंग। हर सेवा के दायरे, प्रक्रिया और डिलीवरी के बारे में जानें।" : "Photography, filmmaking and editing for meaningful moments and brands. Explore the scope, process and deliverables for each service.")}</p>
-    <section className="page-section"><p className="eyebrow"><span/> SERVICE MENU</p><h2>Choose the kind of story you need.</h2><div className="services-grid">{offers.map(({Icon,title,description,details,fit})=><article className="service-card" key={title}><span className="service-icon large"><Icon size={25}/></span><h2>{title}</h2><p>{description}</p><p><strong>Best for:</strong> {fit}</p><ul>{details.map(d=><li key={d}>{d}</li>)}</ul><a className="text-link" href={"/contact?service="+encodeURIComponent(title)}>Ask about this service <ArrowRight size={15}/></a></article>)}</div></section>
-    <section className="page-section"><p className="eyebrow"><span/> OUR PROCESS</p><h2>Simple, collaborative and clear.</h2><div className="services-grid">{[["01","Discover","We discuss your goals, date, audience and style."],["02","Plan","We align the brief, schedule, coverage and outputs."],["03","Create","The work is captured or edited against the agreed scope."],["04","Review","You review the agreed selection and share consolidated feedback."],["05","Deliver","Final files are prepared for the agreed channels and use."]].map(([n,t,d])=><article className="service-card" key={n}><p className="eyebrow">{n}</p><h3>{t}</h3><p>{d}</p></article>)}</div></section>
-    <section className="page-section"><p className="eyebrow"><span/> DELIVERABLES</p><h2>Know what you are commissioning.</h2><div className="services-grid">{[["Edited image gallery","Selected images delivered in agreed dimensions and formats."],["Film or highlight edit","A narrative edit shaped around the brief and available footage."],["Social cut-downs","Vertical and short-form versions when included in scope."],["Retouching and finishing","Consistent colour, cleanup and export quality." ]].map(([t,d])=><article className="service-card" key={t}><h3>{t}</h3><p>{d}</p></article>)}</div><p className="section-subtitle">Exact quantities, turnaround, usage rights and revision rounds are confirmed in the project quote before work begins.</p></section>
-    <section className="page-section"><p className="eyebrow"><span/> PREPARING YOUR BRIEF</p><h2>Details that help us plan well.</h2><div className="categories-footnote">Share the date and location, event schedule, reference images, intended audience, delivery deadline, preferred formats and approximate budget. For editing-only work, explain what source files are available and the intended final platform.</div></section>
-    <section className="page-section"><p className="eyebrow"><span/> QUALITY CHECKS</p><h2>Finishing is part of the craft.</h2><p className="section-subtitle">Before delivery, work should be checked for focus, exposure, colour consistency, audio clarity, spelling in graphics, export settings and suitability for the intended platform.</p></section>
-    <section className="page-section"><p className="eyebrow"><span/> COMMON QUESTIONS</p><div className="services-grid">{[["How much does a project cost?","Pricing depends on scope, hours, location, deliverables and editing requirements; request a quote for your brief."],["Can I request a particular style?","Yes—share reference images or links so expectations can be discussed before production."],["Are all images on this site client projects?","No. Sample visuals are marked as demo until verified work is supplied and approved."],["Can you edit footage I already have?","Editing-only requests can be discussed with details about file volume, format and desired output."]].map(([q,a])=><article className="service-card" key={q}><h3>{q}</h3><p>{a}</p></article>)}</div></section>
-    <section className="page-section"><p className="eyebrow"><span/> READY WHEN YOU ARE</p><h2>Let's plan your project.</h2><p className="section-subtitle">Send the basics and we can clarify the right service, schedule and deliverables.</p><a className="button button-gold" href="/contact">Start an enquiry <ArrowRight size={15}/></a></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "सेवाओं की सूची" : "SERVICE MENU"}</p><h2>{language === "hi" ? "आप किस तरह की कहानी बनाना चाहते हैं?" : "Choose the kind of story you need."}</h2><div className="services-grid">{offers.map(({Icon,title,description,details,fit})=><article className="service-card" key={title}><span className="service-icon large"><Icon size={25}/></span><h2>{title}</h2><p>{description}</p><p><strong>{language === "hi" ? "उपयुक्त:" : "Best for:"}</strong> {fit}</p><ul>{details.map(d=><li key={d}>{d}</li>)}</ul><a className="text-link" href={contactHref + "?service=" + encodeURIComponent(title)}>{language === "hi" ? "इस सेवा के बारे में पूछें" : "Ask about this service"} <ArrowRight size={15}/></a></article>)}</div></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "हमारी प्रक्रिया" : "OUR PROCESS"}</p><h2>{language === "hi" ? "सरल, सहयोगी और स्पष्ट।" : "Simple, collaborative and clear."}</h2><div className="services-grid">{process.map(([n,t,d])=><article className="service-card" key={n}><p className="eyebrow">{n}</p><h3>{t}</h3><p>{d}</p></article>)}</div></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "आपको क्या मिलेगा" : "DELIVERABLES"}</p><h2>{language === "hi" ? "काम शुरू करने से पहले डिलीवरी स्पष्ट रखें।" : "Know what you are commissioning."}</h2><div className="services-grid">{deliverables.map(([t,d])=><article className="service-card" key={t}><h3>{t}</h3><p>{d}</p></article>)}</div><p className="section-subtitle">{language === "hi" ? "काम शुरू होने से पहले प्रोजेक्ट कोट में मात्रा, समय-सीमा, उपयोग के अधिकार और संशोधन के दौर स्पष्ट किए जाएँगे।" : "Exact quantities, turnaround, usage rights and revision rounds are confirmed in the project quote before work begins."}</p></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "अपने काम की जानकारी तैयार करें" : "PREPARING YOUR BRIEF"}</p><h2>{language === "hi" ? "बेहतर योजना के लिए ये विवरण साझा करें।" : "Details that help us plan well."}</h2><div className="categories-footnote">{language === "hi" ? "तारीख और स्थान, कार्यक्रम का समय, संदर्भ तस्वीरें, दर्शक, डिलीवरी की समय-सीमा, पसंदीदा फ़ॉर्मेट और अनुमानित बजट बताएँ। केवल एडिटिंग के लिए उपलब्ध सोर्स फाइलों और अंतिम प्लेटफ़ॉर्म की जानकारी दें।" : "Share the date and location, event schedule, reference images, intended audience, delivery deadline, preferred formats and approximate budget. For editing-only work, explain what source files are available and the intended final platform."}</div></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "गुणवत्ता की जाँच" : "QUALITY CHECKS"}</p><h2>{language === "hi" ? "फिनिशिंग भी रचनात्मक काम का हिस्सा है।" : "Finishing is part of the craft."}</h2><p className="section-subtitle">{language === "hi" ? "डिलीवरी से पहले फोकस, एक्सपोज़र, रंगों की एकरूपता, ऑडियो की स्पष्टता, ग्राफ़िक्स की वर्तनी, एक्सपोर्ट सेटिंग्स और चुने गए प्लेटफ़ॉर्म के अनुसार गुणवत्ता जाँची जानी चाहिए।" : "Before delivery, work should be checked for focus, exposure, colour consistency, audio clarity, spelling in graphics, export settings and suitability for the intended platform."}</p></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "आम सवाल" : "COMMON QUESTIONS"}</p><div className="services-grid">{faqs.map(([q,a])=><article className="service-card" key={q}><h3>{q}</h3><p>{a}</p></article>)}</div></section>
+    <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "जब आप तैयार हों" : "READY WHEN YOU ARE"}</p><h2>{language === "hi" ? "आइए आपके प्रोजेक्ट की योजना बनाएँ।" : "Let's plan your project."}</h2><p className="section-subtitle">{language === "hi" ? "अपनी ज़रूरत की बुनियादी जानकारी भेजें, ताकि सही सेवा, समय-सारणी और डिलीवरी तय की जा सके।" : "Send the basics and we can clarify the right service, schedule and deliverables."}</p><a className="button button-gold" href={contactHref}>{language === "hi" ? "पूछताछ शुरू करें" : "Start an enquiry"} <ArrowRight size={15}/></a></section>
   </SiteFrame>;
 }
 
