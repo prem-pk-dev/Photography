@@ -4,7 +4,7 @@ Use this checklist only in the **Preview** environment and a test admin account.
 
 ## Configure Preview secrets in the Cloudflare dashboard
 
-**Hold status:** The user has explicitly placed `SUPABASE_SERVICE_ROLE_KEY` setup on hold. Do not add, rotate, request, or change that secret until the user explicitly resumes this task. While this hold remains, skip live Storage upload/read/delete tests; continue only source review, isolated automated tests, and non-secret checks.
+**Current status (2026-11-02):** The user-provided Preview `/api/ready` screenshot reports `status: ready`, `adminSetupSecretConfigured: true`, `supabaseStorageConfigured: true`, `mediaStatus: ready`, and `blockers: []`. Treat older notes below about a secret-configuration hold or missing Preview Storage configuration as historical snapshots, superseded for the viewed Preview deployment by this screenshot. Do not request, print, or change any secret. Live Storage tests may proceed only through the app's normal Preview admin UI with a test asset and safe cleanup; do not test against Production. Readiness confirms configuration presence, not end-to-end Storage behavior.
 
 When the user resumes secret configuration:
 
@@ -250,3 +250,11 @@ Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` an
 - [ ] **Still blocked:** validate every referenced table/column and data-preservation behavior against that restored schema, then rehearse the forward migration on the disposable restore.
 - [ ] Do not apply migration SQL to Production, change Production bindings, merge either draft PR, or treat fixture success as proof of Production compatibility.
 
+
+
+## Latest user-provided Preview readiness evidence (2026-11-02)
+
+- [x] Screenshot of Preview `/api/ready` shows `status: ready`, `schema: legacy-compatible`, `adminSetupSecretConfigured: true`, `supabaseStorageConfigured: true`, `supabaseStorageEnvPresence.url/serviceRoleKey/bucket: true`, `mediaStatus: ready`, `adminSetupComplete: true`, `adminCount: 1`, and `blockers: []`.
+- [x] This supersedes earlier statements that Preview Storage configuration was absent or on hold, for the deployment shown in the screenshot only.
+- [ ] Real JPEG/video upload, media retrieval, safe deletion/cleanup, invalid file rejection, and quota enforcement still require end-to-end verification in Preview.
+- [ ] Production D1 backup/restore and schema compatibility remain blocked; no Production changes are authorized by this readiness result.
