@@ -10,10 +10,10 @@ const copy = {
   en: {
     nav: ["Home", "Portfolio", "Services", "About", "Showreel", "Contact"],
     eyebrow: "PHOTOGRAPHY · FILMMAKING · EDITING",
-    heroTitle: "Moments into timeless stories.",
+    heroTitle: "Capture Your Special Moments",
     heroText: "Photography, cinematic films and thoughtful editing for the moments and brands that matter.",
-    viewPortfolio: "Explore portfolio",
-    contactSunil: "Contact Sunil",
+    viewPortfolio: "View Portfolio",
+    contactSunil: "Book Your Shoot",
     demo: "DEMO PORTFOLIO",
     sampleNotice: "Sample visuals are for layout preview only — they are not Sunil's real client work.",
     categoriesEyebrow: "EXPLORE OUR WORK",
@@ -66,10 +66,10 @@ const copy = {
   hi: {
     nav: ["होम", "पोर्टफोलियो", "सेवाएँ", "परिचय", "शो-रील", "संपर्क"],
     eyebrow: "फोटोग्राफी · फिल्ममेकिंग · एडिटिंग",
-    heroTitle: "पलों को यादगार कहानियों में बदलें।",
+    heroTitle: "आपके खास पलों को यादगार बनाएँ",
     heroText: "खास पलों और ब्रांड्स के लिए फोटोग्राफी, सिनेमैटिक फिल्में और बेहतरीन एडिटिंग।",
     viewPortfolio: "पोर्टफोलियो देखें",
-    contactSunil: "सुनील से संपर्क करें",
+    contactSunil: "अपना शूट बुक करें",
     demo: "डेमो पोर्टफोलियो",
     sampleNotice: "ये नमूना तस्वीरें केवल वेबसाइट के प्रीव्यू के लिए हैं — ये सुनील के वास्तविक क्लाइंट प्रोजेक्ट नहीं हैं।",
     categoriesEyebrow: "हमारा काम देखें",
@@ -250,8 +250,8 @@ export default function App() {
             <p className="hero-services">Photography <b>·</b> Videography <b>·</b> Photo Editing <b>·</b> Video Editing</p>
             <p className="hero-description">{t.heroText}</p>
             <div className="hero-buttons">
-              <a className="button button-gold" href="#categories">{t.viewPortfolio}<ArrowDownRight size={17} /></a>
-              <a className="button button-outline" href="#contact"><MessageCircle size={16} />{t.contactSunil}</a>
+              <a className="button button-gold" href="#contact"><MessageCircle size={16} />{t.contactSunil}</a>
+              <a className="button button-outline" href="#categories">{t.viewPortfolio}<ArrowDownRight size={17} /></a>
             </div>
             <div className="hero-facts">
               <div><strong>14</strong><span>{language === "en" ? "Portfolio categories" : "पोर्टफोलियो कैटेगरी"}</span></div>
@@ -334,6 +334,22 @@ export default function App() {
                 <h3>{title[language]}</h3><p>{detail[language]}</p><span className="service-card-link">{t.learnMore}<ArrowRight size={15} /></span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="why-section section-wrap" aria-labelledby="why-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{language === "en" ? "THE GOLDEN FILMS APPROACH" : "GOLDEN FILMS का तरीका"}</p>
+              <h2 id="why-title">{language === "en" ? "Thoughtful work, from first frame to final edit." : "पहले फ्रेम से आखिरी एडिट तक, सोच-समझकर किया गया काम।"}</h2>
+              <p className="section-subtitle">{language === "en" ? "A clear creative process for photography, films and editing—shaped around the story you want to tell." : "फोटोग्राफी, फिल्म और एडिटिंग के लिए एक स्पष्ट क्रिएटिव प्रक्रिया—आपकी कहानी के अनुसार।"}</p>
+            </div>
+          </div>
+          <div className="why-grid">
+            <article className="why-card"><span className="why-number">01</span><span className="why-icon"><Camera size={22} strokeWidth={1.5} /></span><h3>{language === "en" ? "Story-first approach" : "कहानी को प्राथमिकता"}</h3><p>{language === "en" ? "Start with your occasion, people and priorities before shaping the visual direction." : "विजुअल दिशा तय करने से पहले आपके अवसर, लोगों और प्राथमिकताओं को समझना।"}</p></article>
+            <article className="why-card"><span className="why-number">02</span><span className="why-icon"><Film size={22} strokeWidth={1.5} /></span><h3>{language === "en" ? "Capture and create" : "शूट और क्रिएशन"}</h3><p>{language === "en" ? "Photography and videography options for celebrations, portraits, events and brands." : "समारोह, पोर्ट्रेट, इवेंट और ब्रांड के लिए फोटोग्राफी व वीडियोग्राफी के विकल्प।"}</p></article>
+            <article className="why-card"><span className="why-number">03</span><span className="why-icon"><WandSparkles size={22} strokeWidth={1.5} /></span><h3>{language === "en" ? "Careful finishing" : "बारीकी से फिनिशिंग"}</h3><p>{language === "en" ? "Photo retouching, color work and video edits to give the final visuals a considered finish." : "अंतिम विजुअल्स को बेहतर फिनिश देने के लिए फोटो रीटचिंग, कलर वर्क और वीडियो एडिटिंग।"}</p></article>
+            <article className="why-card"><span className="why-number">04</span><span className="why-icon"><MessageCircle size={22} strokeWidth={1.5} /></span><h3>{language === "en" ? "Clear communication" : "स्पष्ट बातचीत"}</h3><p>{language === "en" ? "Share the event date, service and ideas through the enquiry form to begin a conversation." : "बातचीत शुरू करने के लिए enquiry form में तारीख, सेवा और अपने विचार साझा करें।"}</p></article>
           </div>
         </section>
 

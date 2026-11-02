@@ -2,11 +2,38 @@
 -- DO NOT run against production until a verified D1 export has been restored to
 -- a disposable database and this exact migration plus the verification queries pass.
 -- Historical enquiries receive consent=0: do not infer consent from old records.
+-- The exported Production schema already includes description_en/description_hi
+-- on categories. Do not add them again: SQLite would reject duplicate columns.
+-- The compatibility check below verifies these columns exist before migration.
+
 --
 -- The live enquiries.email column is NOT NULL, but the current API permits phone-only
 -- enquiries. SQLite cannot drop NOT NULL with ALTER COLUMN, so rebuild this table.
 -- The live catalog audit found no foreign keys referencing enquiries and one explicit
 -- status/created_at index; this migration recreates that index after the rebuild.
+
+-- Worker project writes require both language and locale, while the live table
+-- only has locale. Rebuild the table while preserving every existing translation.
+-- Map language from locale (en/hi), and retain the exact UNIQUE conflict target
+-- used by Worker upserts: (project_id, locale).
+CREATE TABLE project_translations_new (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  language TEXT NOT NULL CHECK (language IN ('en','hi')),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  alt_text TEXT NOT NULL DEFAULT '',
+  locale TEXT NOT NULL CHECK (locale IN ('en','hi')),
+  PRIMARY KEY (project_id, language)
+);
+
+INSERT INTO project_translations_new (project_id, language, title, description, alt_text, locale)
+SELECT project_id, locale, title, description, '', locale
+FROM project_translations;
+
+DROP TABLE project_translations;
+ALTER TABLE project_translations_new RENAME TO project_translations;
+CREATE UNIQUE INDEX idx_project_translations_project_locale
+  ON project_translations(project_id, locale);
 
 CREATE TABLE enquiries_new (
   id TEXT PRIMARY KEY,
@@ -64,7 +91,16 @@ CREATE TABLE IF NOT EXISTS site_content_revisions (
 CREATE INDEX IF NOT EXISTS idx_site_content_revisions_page_created
   ON site_content_revisions(page_slug, created_at DESC);
 
+-- Shared 100 MiB UTC-calendar-month media-upload quota ledger.
+-- This records newly uploaded bytes; deleting media does not retroactively restore quota.
+CREATE TABLE IF NOT EXISTS gf_monthly_media_usage (
+  month_key TEXT PRIMARY KEY,
+  used_bytes INTEGER NOT NULL DEFAULT 0 CHECK (used_bytes >= 0),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Post-migration verification:
+-- PRAGMA table_info(categories) must show description_en and description_hi as NOT NULL with empty-string defaults.
 -- PRAGMA table_info(enquiries) must show email with notnull=0 and consent INTEGER NOT NULL DEFAULT 0.
 -- PRAGMA table_info(admin_users) must show role TEXT NOT NULL DEFAULT 'editor';
 -- SELECT COUNT(*) FROM enquiries WHERE consent NOT IN (0,1) must return 0.

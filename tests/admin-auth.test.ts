@@ -214,7 +214,7 @@ test("initial owner setup fails closed when transactional D1 batch is unavailabl
     body: JSON.stringify({ email: "owner@example.test", password: "long-secure-password-123" })
   }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "admin_setup_unavailable" });
+  assert.deepEqual(await response.json(), { error: "admin_setup_unavailable", diagnosticStage: "d1_batch" });
 });
 
 test("initial owner setup explicitly grants owner only when no admin exists and setup is incomplete", async () => {
@@ -251,4 +251,71 @@ test("initial owner setup rejects when the guarded owner insert creates no row",
   }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
   assert.equal(response.status, 409);
   assert.deepEqual(await response.json(), { error: "initial_setup_already_completed" });
+});
+
+
+test("valid admin credentials create a secure session that the session endpoint recognizes", async () => {
+  const password = "correct horse battery staple 2026";
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 100_000 }, key, 256
+  );
+  const base64url = (bytes: Uint8Array) => {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  };
+  const passwordHash = base64url(new Uint8Array(bits));
+  const passwordSalt = base64url(salt);
+  const queries: string[] = [];
+  let insertedSession = false;
+  let updatedLastLogin = false;
+  let insertedSuccessAudit = false;
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { queries.push(query); return this; },
+        async first<T>() {
+          if (query.includes("INSERT INTO auth_rate_limits")) return { request_count: 1 } as T;
+          if (query.includes("SELECT id, email, password_hash, password_salt, role FROM admin_users")) {
+            return { id: "owner-1", email: "owner@example.test", password_hash: passwordHash, password_salt: passwordSalt, role: "owner" } as T;
+          }
+          if (query.includes("JOIN admin_users u ON u.id = s.admin_user_id")) {
+            return { id: "owner-1", email: "owner@example.test", role: "owner" } as T;
+          }
+          return null as T | null;
+        },
+        async run() {
+          if (query.includes("INSERT INTO admin_sessions")) insertedSession = true;
+          if (query.includes("UPDATE admin_users SET last_login_at")) updatedLastLogin = true;
+          if (query.includes("'login_success'")) insertedSuccessAudit = true;
+          return { success: true, meta: { changes: 1 } };
+        },
+        async all<T>() { return { success: true, results: [] as T[] }; }
+      };
+    }
+  };
+
+  const login = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.9" },
+    body: JSON.stringify({ email: "OWNER@example.test", password }),
+  }), { DB: db });
+  assert.equal(login.status, 200);
+  const loginBody = await login.text();
+  assert.deepEqual(JSON.parse(loginBody), { ok: true, admin: { id: "owner-1", email: "owner@example.test", role: "owner" } });
+  const cookie = login.headers.get("set-cookie") ?? "";
+  assert.match(cookie, /^__Host-gf_admin=[A-Za-z0-9_-]+; Path=\/; Max-Age=28800; Secure; HttpOnly; SameSite=Strict$/);
+  assert.equal(insertedSession, true);
+  assert.equal(updatedLastLogin, true);
+  assert.equal(insertedSuccessAudit, true);
+  assert.ok(queries.some(query => query.includes("INSERT INTO admin_sessions")));
+  assert.ok(!loginBody.includes(password), "response must not disclose credentials");
+
+  const session = await worker.fetch(new Request("https://example.test/api/admin/session", {
+    headers: { cookie: cookie.split(";")[0] },
+  }), { DB: db });
+  assert.equal(session.status, 200);
+  assert.deepEqual(await session.json(), { authenticated: true, admin: { id: "owner-1", email: "owner@example.test", role: "owner" } });
 });

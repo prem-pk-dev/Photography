@@ -22,6 +22,13 @@ SELECT p.id, p.slug, p.category_slug
 FROM projects p LEFT JOIN categories c ON c.slug = p.category_slug
 WHERE c.slug IS NULL;
 
+-- Translation writes must have both Worker-required columns, and language must
+-- agree with locale after migration. Expected: zero rows.
+PRAGMA table_info('project_translations');
+SELECT project_id, language, locale
+FROM project_translations
+WHERE language NOT IN ('en','hi') OR locale NOT IN ('en','hi') OR language <> locale;
+
 -- D. Project translations must point to existing projects and use en/hi.
 -- Both queries should return zero rows.
 SELECT pt.project_id, pt.locale

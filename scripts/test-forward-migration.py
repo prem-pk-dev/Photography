@@ -133,7 +133,7 @@ CREATE INDEX idx_projects_status_featured ON projects(status, is_featured, updat
 # Capture all legacy values. The only changed legacy table is enquiries, where
 # consent is added and email becomes nullable; all original columns must survive.
 PRESERVATION_QUERIES = {
-    "categories": "SELECT id, slug, sort_order, title_en, title_hi, description_en, description_hi, created_at FROM categories ORDER BY id",
+    "categories": "SELECT id, slug, sort_order, title_en, title_hi, created_at FROM categories ORDER BY id",
     "projects": "SELECT id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label, created_at, updated_at FROM projects ORDER BY id",
     "project_translations": "SELECT project_id, locale, title, description FROM project_translations ORDER BY project_id, locale",
     "project_media": "SELECT id, project_id, media_type, preview_url, original_key, alt_en, alt_hi, sort_order, is_public, created_at FROM project_media ORDER BY id",
@@ -165,8 +165,8 @@ class ForwardMigrationFixtureTest(unittest.TestCase):
         self.db.row_factory = sqlite3.Row
         self.db.executescript(BASELINE_SCHEMA)
         self.db.executescript("""
-          INSERT INTO categories (id, slug, sort_order, title_en, title_hi, description_en, description_hi)
-          VALUES ('wedding-id', 'wedding', 1, 'Wedding', 'शादी', 'Wedding work', 'शादी का काम');
+          INSERT INTO categories (id, slug, sort_order, title_en, title_hi)
+          VALUES ('wedding-id', 'wedding', 1, 'Wedding', 'शादी');
           INSERT INTO projects (id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label)
           VALUES ('project-1', 'sample-project', 'wedding', 'https://example.test/cover.jpg', 'published', 1, 'Jaipur', '2026-10-20', 'Sample only');
           INSERT INTO project_translations (project_id, locale, title, description)
@@ -209,6 +209,17 @@ class ForwardMigrationFixtureTest(unittest.TestCase):
             after,
             before,
             "migration must preserve every captured legacy column value, not only row counts",
+        )
+
+        category_columns = {row["name"]: row for row in self.db.execute("PRAGMA table_info(categories)")}
+        self.assertIn("description_en", category_columns)
+        self.assertIn("description_hi", category_columns)
+        self.assertEqual(category_columns["description_en"]["notnull"], 1)
+        self.assertEqual(category_columns["description_hi"]["notnull"], 1)
+        self.assertEqual(
+            tuple(self.db.execute("SELECT description_en, description_hi FROM categories WHERE id='wedding-id'").fetchone()),
+            ("", ""),
+            "existing categories must receive safe empty-string defaults for new description columns",
         )
 
         columns = {row["name"]: row for row in self.db.execute("PRAGMA table_info(enquiries)")}
@@ -268,6 +279,18 @@ class ForwardMigrationFixtureTest(unittest.TestCase):
         }
         self.assertIn("idx_site_content_revisions_page_created", cms_indexes)
 
+        quota_columns = {
+            row["name"] for row in self.db.execute("PRAGMA table_info(gf_monthly_media_usage)")
+        }
+        self.assertTrue(
+            {"month_key", "used_bytes", "updated_at"}.issubset(quota_columns),
+            "monthly media quota ledger must expose the columns used by the Worker",
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "INSERT INTO gf_monthly_media_usage (month_key, used_bytes) VALUES ('2026-10', -1)"
+            )
+
         # Verify the new constraints, not only the resulting column names.
         self.db.execute(
             "INSERT INTO site_content (page_slug, draft_json, published_json, status) "
@@ -324,11 +347,77 @@ class ForwardMigrationFixtureTest(unittest.TestCase):
             self.db.execute("SELECT COUNT(*) FROM project_translations WHERE project_id='project-1'").fetchone()[0],
             2,
         )
+
+        # The live Worker writes both language and locale, and its upsert uses
+        # (project_id, locale). Verify the migrated schema supports that exact SQL.
+        translation_columns = {
+            row["name"] for row in self.db.execute("PRAGMA table_info(project_translations)")
+        }
+        self.assertTrue(
+            {"project_id", "language", "locale", "title", "description", "alt_text"}.issubset(translation_columns),
+            "translated project schema must expose all columns used by the Worker",
+        )
+        self.assertEqual(
+            [
+                tuple(row)
+                for row in self.db.execute(
+                    "SELECT language, locale, title, alt_text FROM project_translations "
+                    "WHERE project_id='project-1' ORDER BY locale"
+                )
+            ],
+            [("en", "en", "Sample", ""), ("hi", "hi", "नमूना", "")],
+            "legacy translations must map locale into language without losing titles",
+        )
+        self.db.execute(
+            "INSERT INTO project_translations (project_id, language, locale, title, description) "
+            "VALUES (?, 'en', 'en', ?, ?) "
+            "ON CONFLICT(project_id, locale) DO UPDATE SET "
+            "title = excluded.title, description = excluded.description",
+            ("project-1", "Updated sample", "Updated description"),
+        )
+        self.assertEqual(
+            tuple(self.db.execute(
+                "SELECT title, description FROM project_translations "
+                "WHERE project_id='project-1' AND locale='en'"
+            ).fetchone()),
+            ("Updated sample", "Updated description"),
+            "Worker translation upsert must execute and update the existing locale row",
+        )
         self.assertEqual(
             self.db.execute("SELECT category_slug FROM projects WHERE id='project-1'").fetchone()[0],
             "wedding",
         )
         self.assertEqual(list(self.db.execute("PRAGMA foreign_key_check")), [])
+
+        # Verify every explicit Worker ON CONFLICT target against the real SQLite
+        # index metadata. Column existence alone is insufficient: SQLite raises
+        # "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint"
+        # if the exact ordered target is not backed by a unique key.
+        conflict_targets = {
+            "categories": ("slug",),
+            "projects": ("slug",),
+            "project_translations": ("project_id", "locale"),
+            "enquiry_rate_limits": ("ip_hash", "window_start"),
+            "auth_rate_limits": ("rate_key",),
+            "site_content": ("page_slug",),
+            "gf_monthly_media_usage": ("month_key",),
+        }
+        for table, expected_columns in conflict_targets.items():
+            matching_unique_keys = []
+            for index in self.db.execute(f"PRAGMA index_list({table})"):
+                if not index["unique"]:
+                    continue
+                index_name = index["name"].replace('"', '""')
+                columns = tuple(
+                    row["name"]
+                    for row in self.db.execute(f'PRAGMA index_info("{index_name}")')
+                )
+                matching_unique_keys.append(columns)
+            self.assertIn(
+                expected_columns,
+                matching_unique_keys,
+                f"{table} must have a UNIQUE/PRIMARY KEY target on {expected_columns} for Worker upserts",
+            )
 
 
 if __name__ == "__main__":

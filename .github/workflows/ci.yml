@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, "feat/supabase-storage-free-tier"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,7 +28,39 @@ jobs:
         run: npm test
       - name: Run forward-migration SQLite fixture test
         run: python3 scripts/test-forward-migration.py
+      - name: Run media cleanup ledger SQLite fixture test
+        run: python3 scripts/test-media-cleanup-ledger.py
       - name: Run fresh-schema Worker contract fixture test
         run: python3 scripts/test-fresh-schema.py
       - name: Build frontend
         run: npm run build
+
+      - name: Smoke-test deployed preview health endpoint
+        env:
+          PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 "$PREVIEW_BASE_URL/api/health")"
+          echo "$response" | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; const body=JSON.parse(s); if(body.status!=="ok" || body.service!=="golden-films-api") { console.error(body); process.exit(1); } console.log("Deployed preview health check passed:", JSON.stringify(body));'
+      - name: Smoke-test deployed preview readiness endpoint
+        env:
+          PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --output /tmp/readiness.json --write-out '%{http_code}' "$PREVIEW_BASE_URL/api/ready")"
+          echo "Readiness HTTP status: $status"
+          cat /tmp/readiness.json
+          echo
+          node --input-type=module -e 'import fs from "node:fs"; const body=JSON.parse(fs.readFileSync("/tmp/readiness.json","utf8")); if(body.status!=="ready" || body.schema!=="legacy-compatible" || body.supabaseStorageConfigured!==true || body.blockers?.length!==0) { console.error("Readiness check failed:", JSON.stringify(body)); process.exit(1); } console.log("Deployed preview readiness check passed:", JSON.stringify({status:body.status,schema:body.schema,adminSetupComplete:body.adminSetupComplete,adminCount:body.adminCount,supabaseStorageConfigured:body.supabaseStorageConfigured,blockers:body.blockers}));'
+          test "$status" = "200"
+
+      - name: Smoke-test deployed preview admin endpoints reject unauthenticated requests
+        env:
+          PREVIEW_BASE_URL: https://feat-supabase-storage-free-t.golden-films.pages.dev
+        run: |
+          set -euo pipefail
+          for path in /api/admin/session /api/admin/users /api/admin/audit; do
+            status="$(curl --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 --output /tmp/admin-response.json --write-out '%{http_code}' "$PREVIEW_BASE_URL$path")"
+            echo "$path unauthenticated HTTP status: $status"
+            node --input-type=module -e 'import fs from "node:fs"; const path=process.argv[1]; const status=process.argv[2]; const body=JSON.parse(fs.readFileSync("/tmp/admin-response.json","utf8")); if(path==="/api/admin/session") { if(status!=="401" || body.authenticated!==false) { console.error("Unexpected session response:", body); process.exit(1); } } else if(status!=="401" || body.error!=="unauthorized") { console.error("Unexpected protected endpoint response:", body); process.exit(1); } const text=JSON.stringify(body); if(/service.role|secret|password|token|password_hash|password_salt/i.test(text)) { console.error("Potential sensitive data in unauthenticated response"); process.exit(1); } console.log("Unauthenticated access denied without sensitive fields:", path);' "$path" "$status"
+          done

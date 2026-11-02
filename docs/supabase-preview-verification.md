@@ -1,0 +1,252 @@
+# Supabase Storage Preview Verification Runbook
+
+Use this checklist only in the **Preview** environment and a test admin account. Do not run write tests against Production until the Production D1 schema and binding are repaired and a backup is verified.
+
+## Configure Preview secrets in the Cloudflare dashboard
+
+**Hold status:** The user has explicitly placed `SUPABASE_SERVICE_ROLE_KEY` setup on hold. Do not add, rotate, request, or change that secret until the user explicitly resumes this task. While this hold remains, skip live Storage upload/read/delete tests; continue only source review, isolated automated tests, and non-secret checks.
+
+When the user resumes secret configuration:
+
+1. Open the official Cloudflare dashboard: https://dash.cloudflare.com/ and choose the account containing the `golden-films` Pages project.
+2. Open **Workers & Pages → golden-films → Settings → Variables and Secrets** and select **Preview** only.
+3. Configure `SUPABASE_SERVICE_ROLE_KEY` as a server-side **Secret** and `ADMIN_SETUP_SECRET` as a separate strong Preview-only **Secret**. Never paste secrets into chat, source files, GitHub, client-side `VITE_*` variables, browser storage, or shared Postman environments.
+4. Confirm `SUPABASE_URL=https://lxaqpktmnjzbhtcityyc.supabase.co` and `SUPABASE_STORAGE_BUCKET=golden-films-media`.
+5. Trigger a Preview deployment for `feat/supabase-storage-free-tier` and wait for build and deployment success before runtime verification.
+
+If the dashboard does not offer the Secret type, stop. Never put a sensitive key into a plain-text variable as a workaround.
+
+## Current prerequisite status
+
+**Latest confirmed automated verification (2026-11-01):** GitHub Actions run [#485](https://github.com/pkdiv6548/Photography/actions/runs/41268523951) (Golden Films checks) completed with conclusion `success` for commit `5ddb1b001dc6df0400d2700f4e3a7174538f835e`. This run includes the added regression tests that media replace and hide routes reject unauthenticated requests with HTTP 401. Typecheck, Worker API regression tests, forward-migration SQLite fixture, fresh-schema Worker contract fixture, and frontend production build all passed. These are automated/fixture checks only; they do not confirm live Storage operations, live API readiness, or Production schema compatibility.
+
+**Latest confirmed automated verification (2026-10-31):** GitHub Actions run [#416](https://github.com/pkdiv6548/Photography/actions/runs/41199427564) (`Golden Films checks`) completed with conclusion `success` for commit `08048b9ea469e0934fdde02630428333d63b8f01`. Cloudflare Pages Preview deployment for the same commit also reports `success`: https://76c23532.golden-films.pages.dev. The configured CI checks passed, including typecheck, Worker API regression tests, migration/schema fixtures, and frontend production build. This is build/deployment evidence only; it does not confirm live API readiness, browser behavior, real Supabase Storage operations, or Production schema compatibility. The available verification environment's outbound-request policy blocked direct Pages-host probes; that is not a response from the site's API.
+
+**Configuration and read-only D1 schema audit (Cloudflare API, 2026-10-30):**
+
+- [x] Use the branch Preview alias `https://feat-supabase-storage-free-t.golden-films.pages.dev` to follow the latest successful deployment for this feature branch. Individual immutable deployment URLs change after each new commit. Deployment success confirms build/deploy only, not API readiness.
+- [x] Preview D1 binding `DB` is configured to database `golden-films-preview-test` (`21f470cb-776a-4eb2-816e-16605139299a`).
+- [x] Read-only schema inspection confirms Preview has `gf_monthly_media_usage`, `admin_users.role`, `enquiries.consent`, `site_content`, and `site_content_revisions`.
+- [x] Preview non-secret variables `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET` are configured.
+- [ ] **BLOCKED:** Preview `ADMIN_SETUP_SECRET` secret entry is present but has no configured value.
+- [ ] **BLOCKED:** Preview `SUPABASE_SERVICE_ROLE_KEY` is absent from Pages environment configuration.
+- [ ] **BLOCKED:** Production project config has no `DB` D1 binding and no `SUPABASE_SERVICE_ROLE_KEY` configured.
+- [ ] **BLOCKED:** Read-only schema inspection of Production database `golden-films-db` (`0241231b-6e6c-410b-a5ac-958eeb424a78`) shows it lacks `admin_users.role`, `enquiries.consent`, `site_content`, `site_content_revisions`, and `gf_monthly_media_usage`. The current Worker upload/read routes use the legacy `project_media` table (columns required by the Worker include `id`, `project_id`, `media_type`, `preview_url`, `original_key`, `alt_en`, `alt_hi`, `sort_order`, and `is_public`); verify those exact columns in Production before any rollout. No Production schema or data was changed.
+- [ ] **Migration review required:** Candidate forward-only SQL is in `docs/forward-migrations/2026-10-29-live-schema-forward.sql`; its SQLite fixture is `scripts/test-forward-migration.py`. The candidate now includes the shared monthly quota ledger and the fixture checks its schema/constraint, but this is not a Production-ready approval. Restore a verified Production export to a disposable database, run this exact migration and all verification scripts there, compare every Worker SQL query against the restored schema (especially `project_media`), and confirm all existing data is preserved before rollout. Do not execute against Production.
+- [ ] Set `SUPABASE_SERVICE_ROLE_KEY` as a Cloudflare Pages server-side Secret in Preview and set a strong, Preview-only `ADMIN_SETUP_SECRET`.
+- [ ] Validate the Production backup/restore and review the schema migration plan before any Production DB change; do not run the compatibility SQL blindly.
+- [ ] Configure and verify Production D1 binding and server-side Supabase secret only after the schema plan is approved.
+- [ ] Redeploy Preview after secret changes and rerun runtime verification.
+
+**Runtime probe note:** An attempted API probe from the current verification environment was blocked by its outbound-request policy (HTTP 403 message stated requests to the Pages host are not allowed). This is **not** an observed response from the site's API. Treat `/api/health` and `/api/ready` as **Not verified / Blocked**, and run the smoke checks from a normal browser or permitted network.
+
+## Smoke checks
+
+1. Open the latest Preview deployment URL and check `GET /api/health`; expected HTTP 200 with `{"status":"ok","service":"golden-films-api"}`.
+2. Check `GET /api/ready`; expected HTTP 200 only when D1 and all required schema columns/tables are present. A 503 means the API is not ready—do not proceed to upload tests.
+3. Use the admin UI to complete first-admin setup with the Preview setup secret. Confirm login works, then sign out and confirm a protected admin route rejects unauthenticated requests.
+4. Upload a small test JPEG (<1 MiB) from the admin UI. Confirm it appears in the private `golden-films-media` bucket and renders through the intended app media route; do not make the bucket public.
+5. Upload a valid test video under 20 MiB and confirm it can be read through the app route.
+6. Confirm an unsupported MIME type and a file larger than 20 MiB are rejected. Confirm failed uploads do not consume monthly quota.
+7. In a disposable test environment, exercise the 100 MiB monthly cap with small uploads or controlled mocked quota values. Verify the request that would exceed the limit is rejected and the quota cannot be bypassed by another admin. Do not fill a real project quota with repeated large uploads.
+8. Delete the test media through the admin flow and confirm the object is removed or no longer served. Verify draft/unpublished media is not publicly accessible.
+9. Submit a clearly marked test enquiry and confirm it persists in Preview D1; then test invalid fields and repeated requests for expected validation/rate-limit behaviour.
+10. Record each HTTP status, result, and deployment commit in the PR. Remove test assets and test admin credentials when finished.
+
+## Stop conditions
+
+- Any `/api/ready` 503, schema mismatch, unexplained 5xx, public access to draft media, quota overrun, or missing D1 binding: stop and fix Preview before continuing.
+- Do not run the production compatibility SQL or alter Production D1 as part of this runbook.
+- Do not merge PR #87 or claim launch readiness until the Preview checks pass and the Production backup/schema/binding plan has been independently verified.
+
+## Verification results log template
+
+Copy this table into the PR comment or a separate test report when running the checklist. Record only outcomes and non-sensitive metadata; **never record secrets, cookies, session tokens, or private media URLs**.
+
+| Check | Environment / commit | Expected result | Actual status / result | Pass / fail / blocked | Notes |
+|---|---|---|---|---|---|
+| `GET /api/health` | Preview / `<commit SHA>` | HTTP 200, service status `ok` | Not run | Blocked | |
+| `GET /api/ready` | Preview / `<commit SHA>` | HTTP 200 when dependencies/schema are ready | Not run | Blocked | |
+| Admin login and protected-route denial | Preview test admin | Login succeeds; unauthenticated protected request denied | Not run | Blocked | |
+| JPEG upload and media read | Preview test project | Upload succeeds; media served only through app route | Not run | Blocked | |
+| MP4/WebM upload and read | Preview test project | Valid video under 20 MiB succeeds | Not run | Blocked | |
+| Unsupported type / over 20 MiB | Preview | Request rejected; quota unchanged | Not run | Blocked |
+| MIME/signature mismatch (e.g. text payload labelled `image/jpeg`) | Automated Worker test + Preview where practical | HTTP 415 `file_signature_mismatch`; no object or quota reservation | Not run | Blocked | |
+| Shared 100 MiB monthly quota | Disposable/test environment | Over-limit upload rejected across admins | Not run | Blocked |
+| Automated quota guard (mocked D1 fixture) | GitHub Actions run #370 / commit `633c04873105c6e37693e54859319cdb8c44f548` | Over-limit reservation returns 413 and storage is not contacted | Passed | Pass | Automated regression test only; does not replace live Preview quota verification | |
+| Delete and unpublished-media access | Preview test assets | Deleted asset no longer served; draft asset inaccessible publicly | Not run | Blocked | |
+| Enquiry validation and persistence | Preview | Valid test enquiry persists; invalid input rejected | Not run | Blocked | |
+| Mobile and page-by-page regression | Preview | Layout/navigation/content behave as intended | Not run | Blocked | |
+
+Use **Blocked** rather than **Pass** when a prerequisite such as secrets, D1 binding, migration, or deployment is not ready. Attach sanitized logs or screenshots where useful. Do not include production customer data in test evidence.
+
+
+## Preview owner-setup secret refresh (2026-10-31)
+
+After changing Cloudflare Pages Preview secrets, create a new Preview deployment before testing first-owner setup. Keep the environment selector on **Preview**; do not change Production as part of this check.
+
+1. In Cloudflare Pages, confirm `ADMIN_SETUP_SECRET` is configured as a **Secret** for Preview and `DB` is bound to the disposable Preview D1 database.
+2. Trigger a new deployment from `feat/supabase-storage-free-tier`.
+3. After deployment succeeds, check `GET /api/ready` and inspect the non-sensitive readiness fields, especially `adminSetupSecretConfigured`, `adminSetupComplete`, `adminCount`, and the blocker list.
+4. Open the Preview owner setup page and submit a test only if readiness confirms the secret and database are configured. Never put secret values, passwords, cookies, or tokens in logs, screenshots, or commits.
+5. If the endpoint still returns `admin_setup_not_configured`, investigate deployment/environment binding behavior and Worker routing before retrying setup. Do not change Production or merge a PR as a workaround.
+
+
+## Latest CI confirmation (2026-10-31, run #419)
+
+- GitHub Actions run [#419](https://github.com/pkdiv6548/Photography/actions/runs/41199931576) completed successfully for commit `0842d583c80c4eb417416e56f7f7fa7e0154b40f`.
+- Run #419 validates the configured automated checks: dependency installation, frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture, fresh-schema Worker contract fixture, and frontend production build.
+- Earlier commit `e0d14f08e36044928a4fab8cd874b3c475007998` only changed three media-test descriptions to name Supabase Storage rather than R2; it did not change test logic or runtime behavior.
+- CI success is not live verification. The latest Preview deployment status, Preview secrets/readiness, real Supabase upload/read/delete flows, and Production schema compatibility are still unverified or blocked.
+- Keep PR #87 in Draft and PR #63 in Draft. Do not merge or change Production until a verified Production D1 backup has been restored to a disposable database, the complete Worker SQL/schema contract has passed against that restore, Preview secrets are configured in the Preview environment, and end-to-end Preview smoke tests pass.
+
+
+## User-provided Preview readiness evidence (2026-10-31)
+
+- A user-provided mobile-browser screenshot of the Preview `/api/ready` response shows: `status: blocked`, `schema: legacy-compatible`, `adminSetupSecretConfigured: true`, `supabaseStorageConfigured: false`, `mediaStatus: blocked`, `adminSetupComplete: true`, `adminCount: 1`, blocker `supabase_storage_not_configured`, and notice `admin_setup_already_completed`.
+- This is direct evidence that the currently viewed Preview deployment reports owner setup complete but media readiness blocked by Supabase Storage configuration. Do not repeat admin setup.
+- The screenshot does not expose secret values and does not prove actual upload/read/delete behavior. Storage end-to-end checks remain blocked. The user has explicitly put service-role-key setup on hold; do not request or change it until the user resumes that work.
+- Next safe action while that hold remains: preserve this readiness evidence and continue only with non-secret, read-only review/documentation. Do not merge PR #87 or change Production.
+
+
+## Read-only media lifecycle review (2026-10-31)
+
+Reviewed `worker/index.ts` and `tests/admin-media.test.ts` on branch `feat/supabase-storage-free-tier`. This is a source-code review only; no live Storage request or database write was performed.
+
+- [x] Upload path validates authenticated admin, configured Storage, streamed multipart size, file size, allowed MIME type, file signature, project existence, cover constraints, and monthly quota before writing the object.
+- [x] If object upload or the D1 batch fails after quota reservation, the handler attempts to delete the uploaded object and release the reserved monthly bytes.
+- [ ] **Follow-up risk:** compensation is best-effort: object deletion errors are swallowed, and quota release is attempted even if object deletion fails. If the Storage delete fails, an orphaned object could remain while its bytes are no longer counted in the monthly ledger. Before launch, add a durable cleanup/reconciliation strategy or ensure failed cleanup is recorded for operator review; cover this branch with an injected-failure test.
+- [ ] **Delete-flow gap:** the reviewed Worker media routes include upload, external media registration, replace, and hide; no dedicated media-delete route was found in `worker/index.ts`. Hiding is not equivalent to deleting the underlying Storage object or its D1 record. The runbook's delete check must remain blocked until a safe owner-authorized delete workflow exists and is tested, or the checklist is explicitly changed to test hide semantics only.
+- [ ] Add regression tests for: Storage object upload failure releases quota; D1 batch failure attempts object cleanup and releases quota; cleanup failure is surfaced/recorded; hide does not accidentally expose media; and any future delete operation refuses to remove the current cover until it is replaced.
+
+These findings do not change the Preview readiness state: live Supabase Storage remains blocked by the user's explicit service-role-key hold. Do not request the key, change secrets, merge PRs, or modify Production as part of this review.
+
+
+## Follow-up verification checkpoint (2026-10-31, commit b98f741)
+
+- [x] GitHub Actions run [#458](https://github.com/pkdiv6548/Photography/actions/runs/41219197935) passed for commit `b98f741c441a66d49d4a67710d0a300099e362e2`.
+- [x] The run passed frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture test, fresh-schema Worker contract fixture test, and frontend production build.
+- [ ] These automated checks do not cover injected Supabase Storage cleanup failures or prove real object upload/read/delete behavior. The media lifecycle risks above remain open.
+- [ ] The user-facing Preview readiness evidence still reports Storage unconfigured. Keep live Storage tests blocked while service-role-key setup is on hold.
+- [ ] Next safe engineering step: add isolated regression coverage for upload compensation and cleanup failure without touching Production D1, deployment secrets, or live Storage.
+- [ ] Keep PR #87 and PR #63 unmerged; do not perform Production migrations or deployment changes under this checkpoint.
+
+
+## Source-level mobile and content regression review (2026-10-31)
+
+Reviewed `src/App.tsx` and `src/data.ts` only; this is not a device/browser visual test.
+
+- [x] Navigation includes a mobile menu toggle with an accessible label and `aria-expanded`; selecting a navigation item closes the menu.
+- [x] English/Hindi language controls expose pressed state via `aria-pressed`, and portfolio category labels and image alt text have both language variants.
+- [x] Demo portfolio content is explicitly labeled as sample/demo content in the homepage copy and image alt text; it should not be represented as Sunil's real client work.
+- [x] Enquiry submission checks HTTP success, JSON content type, and an explicit `ok: true` response before showing success; failure has a separate status message.
+- [ ] Still requires real mobile-browser checks: 320px/360px/390px widths, menu open/close and keyboard focus, Hindi text wrapping, image loading, form validation/consent, submit success/error states, and direct navigation to each route.
+- [ ] This source review does not establish that the preview deployment is current or that mobile layout has no overflow. Do not mark task 19 complete until browser/device verification is actually performed.
+
+
+## Latest verification checkpoint (2026-10-31, commit d01cd1e)
+
+- [x] GitHub Actions run [#462](https://github.com/pkdiv6548/Photography/actions/runs/41219446575) completed successfully for commit `d01cd1ee2857a9dc9a23b0e98062251cb17ac17c`.
+- [x] Cloudflare Pages reports deployment success for the same commit. Immutable Preview URL: https://a78ecb63.golden-films.pages.dev; branch alias: https://feat-supabase-storage-free-t.golden-films.pages.dev.
+- [ ] The media regression suite still does not prove Storage upload failure compensation, D1 batch failure cleanup, or cleanup-failure handling. Those are open code/test gaps, not passing checks.
+- [ ] No dedicated owner-authorized media-delete route was found in the reviewed Worker code. Do not treat hide as deletion or claim the delete smoke check passed.
+- [ ] Real Storage tests remain blocked because the Preview readiness evidence reports `supabaseStorageConfigured: false`; the user explicitly placed service-role-key setup on hold. Do not request/change the key.
+- [ ] Mobile review remains source-only; viewport, visual overflow, form states, and route-by-route browser checks are still pending.
+- [ ] Keep PR #87 and PR #63 unmerged. No Production D1, secrets, schema, or deployment changes were made for this checkpoint.
+
+
+## Latest CI and Preview deployment checkpoint (2026-10-31, commit 87557a9)
+
+- [x] GitHub Actions `build-and-test` passed for commit `87557a9401e1c9eecb62dd940d843c5f6a436e88` (run [#41219658910](https://github.com/pkdiv6548/Photography/actions/runs/41219658910)).
+- [x] Cloudflare Pages reports a successful Preview deployment for the same commit: https://77622461.golden-films.pages.dev. Branch alias: https://feat-supabase-storage-free-t.golden-films.pages.dev.
+- [x] This commit updates verification documentation only; CI/deployment success is not evidence of real Storage operations or visual browser verification.
+- [ ] Media lifecycle failure coverage remains incomplete: upload failure compensation, D1 batch failure cleanup, and cleanup failure reporting need injected-failure tests. Current cleanup catches and suppresses Storage deletion errors, then still attempts to release quota, so a failed delete may leave an uncounted orphan object.
+- [ ] No dedicated media-delete endpoint was found in the reviewed Worker routes. The existing hide endpoint is not deletion; a safe owner-authorized delete flow must protect current cover images and handle both D1 and Storage consistency.
+- [ ] Preview Storage is still blocked by the previously observed `supabaseStorageConfigured: false`; do not request or change the service-role key while its setup remains on hold.
+- [ ] Mobile checks remain source-only. Actual 320/360/390px visual checks and form/navigation regression are pending.
+- [ ] Keep PR #87 and PR #63 unmerged. No Production D1, secrets, schema, or live Storage writes were changed for this checkpoint.
+
+
+## Media compensation safety fix (2026-10-31, commit b773389)
+
+- [x] Updated the upload compensation path so a failed Supabase Storage delete is no longer silently ignored. It logs a bounded diagnostic containing the media key and error class/message, returns `503 media_upload_cleanup_pending`, and **keeps the monthly quota reservation** while the uploaded object may still exist. This avoids undercounting an orphaned Storage object.
+- [x] When Storage cleanup succeeds (or the upload never created an object), the handler still attempts to release the reserved quota. A quota-release failure is now logged for operator follow-up instead of being silently swallowed.
+- [ ] CI/typecheck and regression tests for this code change are pending. Do not mark this fix fully verified until the commit checks pass and an injected cleanup-failure test covers the branch.
+- [ ] This source-level fix does not add a dedicated delete endpoint and does not unblock real Storage checks; Preview Storage configuration remains on hold.
+
+
+## Latest media-compensation CI confirmation (2026-10-31, commit b773389)
+
+- [x] GitHub Actions `build-and-test` passed for commit `b77338991a407fa5aca5314a113b4daf8c817dd0` (run [#41219848846](https://github.com/pkdiv6548/Photography/actions/runs/41219848846)).
+- [x] Cloudflare Pages reports a successful Preview deployment for that commit (immutable URL: https://5fb93fc3.golden-films.pages.dev; branch alias: https://feat-supabase-storage-free-t.golden-films.pages.dev).
+- [x] Follow-up documentation commit `777b246dc7457259b38bb35aab5e86845f87b090` also passed its configured `build-and-test` checks (runs [#41219857597](https://github.com/pkdiv6548/Photography/actions/runs/41219857597) and [#41219853455](https://github.com/pkdiv6548/Photography/actions/runs/41219853455)).
+- [ ] Passing CI does not yet prove the new `media_upload_cleanup_pending` failure branch; an injected cleanup-failure regression test remains open.
+- [ ] A dedicated safe media-delete endpoint and live Storage verification remain incomplete. Storage verification stays blocked under the explicit service-role-key hold.
+- [ ] No PR was merged and no Production D1, secret, schema, or live Storage write was changed.
+
+## Follow-up CI verification (2026-11-01, commit 90a929c)
+
+- GitHub Actions run [#474](https://github.com/pkdiv6548/Photography/actions/runs/41266140274) completed successfully for commit `90a929caac8fd62ec13e0ec2e984284293ffb49f`.
+- All nine main job steps passed, including dependency installation, frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture, fresh-schema Worker contract fixture, and frontend production build.
+- Added `tests/media-upload-compensation.test.ts` to cover the failure path where Storage upload succeeds but the D1 media-record batch fails: successful Storage cleanup releases the reserved quota; failed Storage cleanup returns `media_upload_cleanup_pending` and retains the reservation.
+- These tests use mocked Storage responses and a fake D1 binding. They do not verify real Supabase credentials, live object operations, or Production schema compatibility.
+- Preview secret setup remains explicitly on hold. Do not run live Storage tests, modify secrets, change Production configuration/data, or merge PR #87 until the user explicitly resumes the held secret task and all schema/rollout gates are satisfied.
+
+## Media API regression progress (2026-11-01)
+
+- CI runs [#494](https://github.com/pkdiv6548/Photography/actions/runs/41268886795), [#495](https://github.com/pkdiv6548/Photography/actions/runs/41268890096), [#496](https://github.com/pkdiv6548/Photography/actions/runs/41268909849), and [#497](https://github.com/pkdiv6548/Photography/actions/runs/41268912741) completed successfully. Coverage includes the early declared-size rejection, upload quota exhaustion before any Storage call, MIME/signature mismatch, editor denial for owner-only media hiding, and preventing an active cover image from being hidden. Checks include typecheck, Worker regression suite, both schema fixtures, and frontend build.
+- These are automated regression/fixture results only. They do not establish live Supabase Storage behavior or Production D1 compatibility.
+- **Media lifecycle gap remains:** no dedicated admin media-delete route was found in the Worker route audit. The current hide operation only sets `project_media.is_public = 0`; it is not a Storage object deletion. Do not interpret hiding as deleting an uploaded object or freeing storage/quota. Before adding a delete endpoint, define owner authorization, cover-image safeguards, D1 audit behavior, Storage cleanup compensation, and quota accounting; test it against a disposable fixture first.
+- Continue to keep Preview service-role secret setup on hold. Do not run live Storage writes, modify secrets, alter Production data/configuration, or merge PR #87 without explicit authorization and completed rollout gates.
+
+## Current continuation checkpoint (2026-11-01)
+
+- The owner has since confirmed that `SUPABASE_SERVICE_ROLE_KEY` and `ADMIN_SETUP_SECRET` are correctly configured in Cloudflare. Treat older notes above describing these values as missing or held as historical snapshots, not current setup instructions. Never request or expose either value in chat.
+- The live Supabase Storage upload/read/delete checks have **not** been independently verified by this code review. Configuration presence and a successful Pages deployment are not proof that runtime calls work.
+- Source review reconfirmed that `POST /api/admin/projects/media/hide` only sets `project_media.is_public = 0`; it does not delete the stored object. No dedicated `POST /api/admin/projects/media/delete` route was found.
+- Do not add a naive delete route that deletes the Storage object before a durable database/audit change, or deletes the database row before Storage cleanup. Either ordering can leave a broken row or an orphaned object if the other operation fails. A safe implementation needs a durable cleanup-pending state/outbox (with retry/reconciliation), owner authorization, cover-image protection, audit logging, and tests for Storage failure and D1 failure.
+- Production D1 export/restore and any Production migration remain paused until the owner is on a PC and can verify a real backup artifact. The earlier export attempt's temporary download URL returned HTTP 403 to the available execution environment; no verified backup file was obtained. Do not count that attempt as a backup.
+- Current safe next steps: continue source-level review and isolated automated tests; then implement media deletion only after the failure/retry design and schema migration are reviewed. Keep PRs #87 and #63 unmerged and do not change Production D1.
+
+## Current CI verification checkpoint (2026-11-02, commit f9b3c1d)
+
+- [x] GitHub Actions run [#724](https://github.com/pkdiv6548/Photography/actions/runs/41330647779) completed successfully for commit `f9b3c1d768df36b9f165ea5053553ef1c8e71fa5`.
+- [x] The run's configured steps passed: frontend/Worker typecheck, Worker API regression tests, forward-migration SQLite fixture, media cleanup-ledger SQLite fixture, fresh-schema Worker contract fixture, frontend production build, deployed Preview health smoke-test step, deployed Preview readiness smoke-test step, and unauthenticated admin-endpoint rejection smoke-test step.
+- [x] The feature branch now includes a durable media-cleanup ledger and retry-oriented delete flow covered by automated tests. The fixture tests are isolated; they are not a restore of Production data.
+- [ ] **Runtime evidence boundary:** the CI smoke-test steps passed, but this checkpoint does not record the response payloads or independently verify real Supabase object upload/read/delete behavior. Keep live Storage checks pending until the held secret-configuration task is explicitly resumed and a safe Preview test is authorized.
+- [ ] **Production gate remains closed:** the Production D1 export did not yield a verified backup artifact (the temporary download URL returned HTTP 403 in the available execution environment). No Production migration, data change, PR merge, or release authorization is implied by this CI success.
+- [ ] **Historical note clarification:** earlier entries in this document record older configuration snapshots and blocked direct probes. Treat those as historical evidence for their stated dates; this newer CI result supersedes only the older CI status, not the unresolved live Storage and Production backup gates.
+- [ ] Keep PR #87 and PR #63 unmerged pending explicit release authorization and completion of the Production backup/schema verification gates.
+
+## Worker SQL contract audit (2026-11-02, source-level)
+
+Scope: reviewed `worker/index.ts` on branch `feat/supabase-storage-free-tier` and inventoried SQL table dependencies and explicit readiness checks. This completes the **source-level portion of BE-06**; it is not a claim that every query has been executed against a restored Production schema.
+
+### Table dependency inventory
+
+- [x] Authentication and authorization: `admin_users`, `admin_sessions`, `admin_setup`, `auth_rate_limits`, `audit_logs`.
+- [x] Enquiry intake and abuse controls: `enquiries`, `enquiry_rate_limits`.
+- [x] Portfolio and media: `projects`, `categories`, `project_media`, `project_translations`.
+- [x] CMS/revisions: `site_content`, `site_content_revisions`.
+- [x] Upload quota and durable delete retry: `gf_monthly_media_usage`, `gf_media_cleanup_jobs`.
+- [x] Additional customer-facing handlers reference `customer_users` and `customer_sessions`; these tables also need inclusion in a complete migration/Production schema comparison if those routes are in scope.
+
+### Explicit Worker schema contract signals
+
+- `admin_users` must provide `id`, `email`, `password_hash`, `password_salt`, `role`, `is_active`, `created_at`, and `last_login_at` across authentication, user-management, and status queries.
+- `admin_sessions` must support `token_hash`, `admin_user_id`, and `expires_at`; authentication joins it to active admin users.
+- `enquiries` readiness explicitly requires `id`, `name`, `email`, `phone`, `service`, `consent`, `status`, `created_at`, and `updated_at`, plus the `enquiry_rate_limits` table.
+- Portfolio readiness explicitly requires `projects(id, slug, category_slug, cover_image_url, status, is_featured)` and `categories(id, slug, title_en, title_hi)`.
+- CMS readiness requires both `site_content` and `site_content_revisions`.
+- Monthly quota logic writes `gf_monthly_media_usage(month_key, used_bytes)`; the current schema fixture also covers `updated_at`.
+- Media deletion expects `gf_media_cleanup_jobs` to persist a job ID, media/project IDs, storage key, status, attempt count, error code, timestamps, and completion timestamp. The exact live schema must be compared with migration `0101_gf_media_cleanup_jobs.sql` and the fixture before release.
+- Media queries depend on `project_media` fields including `id`, `project_id`, `media_type`, `preview_url`, `original_key`, `alt_en`, `alt_hi`, `sort_order`, and `is_public`; project media lifecycle also compares `projects.cover_image_url`.
+
+### Results and boundary
+
+- [x] The current branch's fresh-schema Worker contract fixture and forward-migration fixture passed in CI run [#724](https://github.com/pkdiv6548/Photography/actions/runs/41330647779).
+- [x] The Preview schema was previously inspected read-only and includes the known `admin_users.role`, `enquiries.consent`, CMS, quota, and media-cleanup objects; no Production changes were made.
+- [ ] **Still blocked:** execute the complete Worker query contract against a restored, verified Production export. No verified Production export artifact exists yet, so this must not be marked complete.
+- [ ] **Still blocked:** validate every referenced table/column and data-preservation behavior against that restored schema, then rehearse the forward migration on the disposable restore.
+- [ ] Do not apply migration SQL to Production, change Production bindings, merge either draft PR, or treat fixture success as proof of Production compatibility.
+
