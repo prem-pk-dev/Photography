@@ -82,3 +82,17 @@ The production database has a legacy schema that differs from the Worker contrac
 - Re-read Pages project configuration: production branch is `main`; production D1 binding is absent; preview `DB` binding points to disposable database `21f470cb-776a-4eb2-816e-16605139299a`. The API response showed no plain-text vars in either environment; this does not prove whether encrypted secrets exist.
 - The current media branch uses `DB`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, and `ADMIN_SETUP_SECRET` at runtime. No secret values were read or modified. Admin/API and media runtime behavior remains unverified until the correct preview environment bindings/secrets and database schema are validated.
 - No configuration changes, production writes, migrations, or PR merges were performed.
+
+
+## Preview D1 schema smoke checks (2026-11-02)
+
+Read-only queries against Preview's configured disposable D1 database `golden-films-preview-test` (`21f470cb-776a-4eb2-816e-16605139299a`) returned:
+
+- 19 application tables (excluding Cloudflare internal tables), including `site_content`, `site_content_revisions`, and `gf_monthly_media_usage`.
+- `enquiries.email` is nullable; `enquiries.consent` exists and is NOT NULL, but its default is absent in this fixture. Do not infer it matches the candidate migration without checking exact defaults.
+- `admin_users.role` exists and is NOT NULL, but its default is `'owner'` in this fixture. This differs from the candidate migration's least-privilege default `'editor'`; do not use this fixture as evidence that migration behavior or initial-account privilege defaults match the candidate migration.
+- `pragma_foreign_key_check` returned zero rows on this disposable Preview DB. This is a read-only check only, not a full `integrity_check` and not a Production check.
+- Counts currently read as 1 admin user and 0 projects, 0 project_media rows, 0 enquiries. These are Preview fixture data only.
+- A combined column-check query exceeded SQLite's compound SELECT limit, so it was split into individual read-only queries. No rows were written.
+
+This check surfaced schema drift in the Preview fixture; align/reseed it through a reviewed disposable-only migration workflow before relying on it for runtime verification. No production data/configuration was changed.
