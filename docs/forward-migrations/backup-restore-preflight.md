@@ -74,3 +74,11 @@ The production database has a legacy schema that differs from the Worker contrac
 - The API bridge PR head commit `aeb5e12d1e7185a3c3dafb2c5205ce0817c6154b` has a completed GitHub Actions run (`Golden Films checks`, run `40903640324`) with conclusion `success`. The job completed typecheck, Worker API regression tests, the synthetic forward-migration SQLite fixture test, and frontend build.
 - The latest Supabase/media branch documentation commit `1e8ee022470bbf739c54e085ca62ea623d69536c` has no PR-triggered workflow run returned by the current workflow-run query, and the combined status endpoint returned no statuses. Do not treat this as a passing CI result for that exact commit.
 - These CI results do not clear the real-export restore gate, verify Pages runtime bindings, or prove Supabase secrets are configured. Both PRs remain Draft; no Production settings or data were changed.
+
+
+## Latest deployment/configuration recheck (2026-11-02)
+
+- Cloudflare Pages deployment list confirms Preview deployment `084bc705.golden-films.pages.dev` is `success` for commit `9d843be096cb68394e49fac4e28510b817666c68` on `feat/supabase-storage-free-tier`.
+- Re-read Pages project configuration: production branch is `main`; production D1 binding is absent; preview `DB` binding points to disposable database `21f470cb-776a-4eb2-816e-16605139299a`. The API response showed no plain-text vars in either environment; this does not prove whether encrypted secrets exist.
+- The current media branch uses `DB`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, and `ADMIN_SETUP_SECRET` at runtime. No secret values were read or modified. Admin/API and media runtime behavior remains unverified until the correct preview environment bindings/secrets and database schema are validated.
+- No configuration changes, production writes, migrations, or PR merges were performed.
