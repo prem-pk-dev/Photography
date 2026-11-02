@@ -67,3 +67,10 @@ The production database has a legacy schema that differs from the Worker contrac
 - A direct `PRAGMA integrity_check` request was rejected by D1 with `SQLITE_AUTH`; no integrity-check pass is claimed from that command. Use supported SQL checks (including `PRAGMA foreign_key_check` only if the API permits it) and the repository's verifier script in an authorized test runner.
 - Browser/network probes of Production and Preview `/api/health` and `/api/ready` could not be completed by the available verification tools. Runtime health remains unverified, not proven broken.
 - No Pages configuration, secrets, or Production data were changed. Keep both PRs in Draft until export restore, API runtime checks, and rollout gates are completed.
+
+
+## CI status recheck (2026-11-02)
+
+- The API bridge PR head commit `aeb5e12d1e7185a3c3dafb2c5205ce0817c6154b` has a completed GitHub Actions run (`Golden Films checks`, run `40903640324`) with conclusion `success`. The job completed typecheck, Worker API regression tests, the synthetic forward-migration SQLite fixture test, and frontend build.
+- The latest Supabase/media branch documentation commit `1e8ee022470bbf739c54e085ca62ea623d69536c` has no PR-triggered workflow run returned by the current workflow-run query, and the combined status endpoint returned no statuses. Do not treat this as a passing CI result for that exact commit.
+- These CI results do not clear the real-export restore gate, verify Pages runtime bindings, or prove Supabase secrets are configured. Both PRs remain Draft; no Production settings or data were changed.
