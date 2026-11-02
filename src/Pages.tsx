@@ -7,22 +7,43 @@ const nav = [
   ["About", "/about"], ["Showreel", "/showreel"], ["Contact", "/contact"]
 ];
 
+function getSiteLanguage(): "en" | "hi" {
+  return new URLSearchParams(window.location.search).get("lang") === "hi" ? "hi" : "en";
+}
+
 function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
+  const language = getSiteLanguage();
+  const params = new URLSearchParams(window.location.search);
+  const nextParams = new URLSearchParams(params);
+  nextParams.set("lang", language === "en" ? "hi" : "en");
+  const languageHref = window.location.pathname + "?" + nextParams.toString();
+  const labels: Record<string, string> = language === "hi"
+    ? { Home: "होम", Portfolio: "पोर्टफोलियो", Services: "सेवाएँ", About: "परिचय", Showreel: "शो-रील", Contact: "संपर्क" }
+    : {};
+  const translatedEyebrow = language === "hi" ? ({
+    "THE CREATIVE BEHIND THE LENS": "कैमरे के पीछे की रचनात्मकता",
+    "WHAT WE CREATE": "हम क्या बनाते हैं",
+    "A MOVING PICTURE": "चलती तस्वीरों की कहानी",
+    "LET'S MAKE SOMETHING MEANINGFUL": "आइए कुछ यादगार बनाएँ"
+  } as Record<string, string>)[eyebrow] || eyebrow : eyebrow;
   return <div className="site-shell">
     <header className="site-header">
       <a className="brand" href="/" aria-label="Golden Films home">
         <span className="brand-mark"><Aperture size={28} strokeWidth={1.6} /></span>
         <span className="brand-copy"><strong>GOLDEN <em>FILMS</em></strong><small>PHOTOGRAPHY · FILMS · EDITING</small></span>
       </a>
-      <nav className="main-nav" aria-label="Main navigation">{nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
-      <a className="button button-gold header-cta" href="/contact">Contact <ArrowRight size={15} /></a>
+      <nav className="main-nav" aria-label="Main navigation">{nav.map(([label, href]) => <a key={href} href={href + (language === "hi" ? "?lang=hi" : "")}>{labels[label] || label}</a>)}</nav>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <a className="button button-outline" href={languageHref} lang={language === "en" ? "hi" : "en"} aria-label={language === "en" ? "हिंदी में देखें" : "View in English"}>{language === "en" ? "हिंदी" : "English"}</a>
+        <a className="button button-gold header-cta" href={"/contact" + (language === "hi" ? "?lang=hi" : "")}>{language === "hi" ? "संपर्क करें" : "Contact"} <ArrowRight size={15} /></a>
+      </div>
     </header>
-    {new URLSearchParams(window.location.search).get("preview") === "1" && <div className="demo-banner">Draft preview — unpublished page content</div>}
+    {params.get("preview") === "1" && <div className="demo-banner">{language === "hi" ? "ड्राफ़्ट प्रीव्यू — अप्रकाशित पेज सामग्री" : "Draft preview — unpublished page content"}</div>}
     <main className="section-wrap" style={{ minHeight: "68vh", paddingTop: "64px", paddingBottom: "80px" }}>
-      <p className="eyebrow"><span />{eyebrow}</p><h1>{title}</h1>{children}
-      <p style={{ marginTop: 48 }}><a className="button button-outline" href="/"><ArrowLeft size={16} /> Back to Home</a></p>
+      <p className="eyebrow"><span />{translatedEyebrow}</p><h1>{title}</h1>{children}
+      <p style={{ marginTop: 48 }}><a className="button button-outline" href={"/" + (language === "hi" ? "?lang=hi" : "")}><ArrowLeft size={16} />{language === "hi" ? "होम पर वापस जाएँ" : "Back to Home"}</a></p>
     </main>
-    <footer className="section-wrap" style={{ paddingTop: 24, paddingBottom: 24 }}>GOLDEN FILMS · Photography · Films · Editing</footer>
+    <footer className="section-wrap" style={{ paddingTop: 24, paddingBottom: 24 }}>GOLDEN FILMS · {language === "hi" ? "फोटोग्राफी · फिल्में · एडिटिंग" : "Photography · Films · Editing"}</footer>
   </div>;
 }
 
@@ -441,13 +462,14 @@ function usePublishedPageContent(page: EditablePage) {
 
 function AboutContentPage() {
   const content = usePublishedPageContent("about");
+  const language = getSiteLanguage();
   const values = [
     ["01", "Story before spectacle", "We start with the feeling, people and purpose behind each brief—not just a shot list."],
     ["02", "A considered process", "Planning, capture, selection and finishing are treated as one connected creative process."],
     ["03", "Honest presentation", "Portfolio placeholders are clearly labelled. Client stories and credentials are only added after approval."]
   ];
-  return <SiteFrame eyebrow="THE CREATIVE BEHIND THE LENS" title={content.titleEn || "About Golden Films"}>
-    <p className="section-subtitle">{content.textEn || "Golden Films brings photography, videography, photo editing and video editing together in one creative portfolio. The focus is on preserving meaningful moments and helping people and brands communicate visually."}</p>
+  return <SiteFrame eyebrow="THE CREATIVE BEHIND THE LENS" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "गोल्डन फिल्म्स के बारे में" : "About Golden Films")}>
+    <p className="section-subtitle">{(language === "hi" ? content.textHi : content.textEn) || (language === "hi" ? "Golden Films में फोटोग्राफी, वीडियोग्राफी, फोटो एडिटिंग और वीडियो एडिटिंग के माध्यम से खास पलों को संजोया जाता है और लोगों व ब्रांड्स की कहानियों को दृश्य रूप दिया जाता है।" : "Golden Films brings photography, videography, photo editing and video editing together in one creative portfolio. The focus is on preserving meaningful moments and helping people and brands communicate visually.")}</p>
     <div className="categories-footnote"><Image size={16}/> Portfolio visuals currently contain sample/demo images, not verified client work.</div>
     <section className="page-section"><p className="eyebrow"><span/> OUR POINT OF VIEW</p><h2>Good visuals do more than look beautiful.</h2><p className="section-subtitle">They help people remember a moment, understand a product and feel connected to a story.</p><div className="services-grid">{values.map(([n,t,d])=><article className="service-card" key={n}><span className="service-icon large">{n}</span><h3>{t}</h3><p>{d}</p></article>)}</div></section>
     <section className="page-section"><p className="eyebrow"><span/> WHAT WE BRING TOGETHER</p><h2>One visual story, from capture to finish.</h2><div className="services-grid">{[{i:"01",t:"Photography",d:"Still images for people, celebrations, products and brands."},{i:"02",t:"Videography",d:"Moving images shaped around atmosphere, action and story."},{i:"03",t:"Photo editing",d:"Careful retouching and consistent colour treatment."},{i:"04",t:"Video editing",d:"Pacing, sound, colour and formats suited to the intended audience."}].map(x=><article className="service-card" key={x.i}><p className="eyebrow">{x.i}</p><h3>{x.t}</h3><p>{x.d}</p></article>)}</div></section>
@@ -460,14 +482,15 @@ function AboutContentPage() {
 
 function ServicesContentPage() {
   const content = usePublishedPageContent("services");
+  const language = getSiteLanguage();
   const offers = [
     { Icon: Camera, title: "Photography", description: "Weddings, pre-weddings, portraits, events, fashion and products.", details: ["Story-led coverage and shot planning","Portraits, details and candid moments","Edited high-resolution image selection"], fit:"People, celebrations, products and brands" },
     { Icon: Film, title: "Videography", description: "Cinematic wedding films, events and brand stories.", details: ["Coverage plan and key moments","Story-focused footage capture","Edit-ready organised media"], fit:"Events, celebrations and promotional stories" },
     { Icon: WandSparkles, title: "Photo editing", description: "Retouching, colour correction and creative finishing.", details: ["Exposure and colour consistency","Careful portrait retouching","Export sizes matched to usage"], fit:"Photographers, creators and businesses" },
     { Icon: Clapperboard, title: "Video editing", description: "Cinematic cuts, colour grading, reels and short-form edits.", details: ["Story assembly and pacing","Colour and audio refinement","Social, web and presentation exports"], fit:"Creators, events and brand communications" }
   ];
-  return <SiteFrame eyebrow="WHAT WE CREATE" title={content.titleEn || "Creative Services"}>
-    <p className="section-subtitle">{content.introEn || "Photography, filmmaking and editing for meaningful moments and brands. Explore the scope, process and deliverables for each service."}</p>
+  return <SiteFrame eyebrow="WHAT WE CREATE" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "हमारी क्रिएटिव सेवाएँ" : "Creative Services")}>
+    <p className="section-subtitle">{(language === "hi" ? content.introHi : content.introEn) || (language === "hi" ? "खास पलों और ब्रांड्स के लिए फोटोग्राफी, फिल्ममेकिंग और एडिटिंग। हर सेवा के दायरे, प्रक्रिया और डिलीवरी के बारे में जानें।" : "Photography, filmmaking and editing for meaningful moments and brands. Explore the scope, process and deliverables for each service.")}</p>
     <section className="page-section"><p className="eyebrow"><span/> SERVICE MENU</p><h2>Choose the kind of story you need.</h2><div className="services-grid">{offers.map(({Icon,title,description,details,fit})=><article className="service-card" key={title}><span className="service-icon large"><Icon size={25}/></span><h2>{title}</h2><p>{description}</p><p><strong>Best for:</strong> {fit}</p><ul>{details.map(d=><li key={d}>{d}</li>)}</ul><a className="text-link" href={"/contact?service="+encodeURIComponent(title)}>Ask about this service <ArrowRight size={15}/></a></article>)}</div></section>
     <section className="page-section"><p className="eyebrow"><span/> OUR PROCESS</p><h2>Simple, collaborative and clear.</h2><div className="services-grid">{[["01","Discover","We discuss your goals, date, audience and style."],["02","Plan","We align the brief, schedule, coverage and outputs."],["03","Create","The work is captured or edited against the agreed scope."],["04","Review","You review the agreed selection and share consolidated feedback."],["05","Deliver","Final files are prepared for the agreed channels and use."]].map(([n,t,d])=><article className="service-card" key={n}><p className="eyebrow">{n}</p><h3>{t}</h3><p>{d}</p></article>)}</div></section>
     <section className="page-section"><p className="eyebrow"><span/> DELIVERABLES</p><h2>Know what you are commissioning.</h2><div className="services-grid">{[["Edited image gallery","Selected images delivered in agreed dimensions and formats."],["Film or highlight edit","A narrative edit shaped around the brief and available footage."],["Social cut-downs","Vertical and short-form versions when included in scope."],["Retouching and finishing","Consistent colour, cleanup and export quality." ]].map(([t,d])=><article className="service-card" key={t}><h3>{t}</h3><p>{d}</p></article>)}</div><p className="section-subtitle">Exact quantities, turnaround, usage rights and revision rounds are confirmed in the project quote before work begins.</p></section>
@@ -480,9 +503,10 @@ function ServicesContentPage() {
 
 function ShowreelContentPage() {
   const content = usePublishedPageContent("showreel");
+  const language = getSiteLanguage();
   const chapters = [["01","The atmosphere","Establishing shots, spaces, light and the feeling of a place."],["02","The people","Expressions, interactions and the small moments between poses."],["03","The details","Textures, objects, styling and carefully observed details."],["04","The movement","Action, transitions and sequences that carry a story."],["05","The finish","Pacing, colour, sound and a final export suited to its audience."]];
-  return <SiteFrame eyebrow="A MOVING PICTURE" title={content.titleEn || "Showreel"}>
-    <p className="section-subtitle">{content.textEn || "A showreel brings stills, motion and editing together. This page is structured for an approved film link; no owner-provided showreel has been supplied yet."}</p>
+  return <SiteFrame eyebrow="A MOVING PICTURE" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "शो-रील" : "Showreel")}>
+    <p className="section-subtitle">{(language === "hi" ? content.textHi : content.textEn) || (language === "hi" ? "शो-रील में तस्वीरों, वीडियो और एडिटिंग को एक साथ प्रस्तुत किया जाता है। स्वीकृत वीडियो लिंक मिलने पर उसे यहाँ जोड़ा जाएगा।" : "A showreel brings stills, motion and editing together. This page is structured for an approved film link; no owner-provided showreel has been supplied yet.")}</p>
     <section className="page-section"><p className="eyebrow"><span/> FEATURED FILM</p><h2>A place for the approved showreel.</h2>{content.videoUrl ? <div className="service-card"><p>Watch the published showreel using the approved external video link.</p><a className="button button-gold" href={content.videoUrl} target="_blank" rel="noopener noreferrer">Watch showreel <ArrowRight size={15}/></a></div> : <div className="categories-footnote"><Film size={18}/> Video pending: the owner must provide an approved YouTube/Vimeo URL. No fabricated video is embedded.</div>}</section>
     <section className="page-section"><p className="eyebrow"><span/> WHAT A REEL CAN SHOW</p><h2>Five chapters, one visual language.</h2><div className="services-grid">{chapters.map(([n,t,d])=><article className="service-card" key={n}><p className="eyebrow">{n}</p><h3>{t}</h3><p>{d}</p></article>)}</div></section>
     <section className="page-section"><p className="eyebrow"><span/> STILL PHOTOGRAPHY</p><h2>Frames worth pausing for.</h2><div className="category-grid">{categories.filter(c=>c.group==="photography").slice(0,6).map(c=><article className="category-card" key={c.id}><a className="category-image" href="/portfolio"><img src={c.image} alt={c.imageAlt.en} loading="lazy"/><span className="demo-tag">DEMO</span></a><div className="category-card-copy"><h3>{c.title.en}</h3><p>Sample visual · not verified client work</p></div></article>)}</div></section>
@@ -495,6 +519,7 @@ function ShowreelContentPage() {
 
 function ContactContentPage() {
   const content = usePublishedPageContent("contact");
+  const language = getSiteLanguage();
   const allowedServices = [{ value: "photography", label: "Photography" }, { value: "videography", label: "Videography" }, { value: "photo-editing", label: "Photo editing" }, { value: "video-editing", label: "Video editing" }];
   const requestedService = new URLSearchParams(window.location.search).get("service") || "";
   const [service, setService] = useState(allowedServices.some(item => item.value === requestedService) ? requestedService : "");
@@ -514,8 +539,8 @@ function ContactContentPage() {
     } catch { setResult("The enquiry could not be submitted. Please try again later; no success has been assumed."); }
     finally { setSending(false); }
   };
-  return <SiteFrame eyebrow="LET'S MAKE SOMETHING MEANINGFUL" title={content.titleEn || "Contact & Project Enquiry"}>
-    <p className="section-subtitle">{content.textEn || "Tell us what you are planning, the service you need and how we can reach you. Contact details such as phone, WhatsApp and social links will be added when verified."}</p>
+  return <SiteFrame eyebrow="LET'S MAKE SOMETHING MEANINGFUL" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "संपर्क और प्रोजेक्ट पूछताछ" : "Contact & Project Enquiry")}>
+    <p className="section-subtitle">{(language === "hi" ? content.textHi : content.textEn) || (language === "hi" ? "आप क्या योजना बना रहे हैं, कौन-सी सेवा चाहिए और आपसे कैसे संपर्क किया जाए—यह जानकारी साझा करें। फोन, WhatsApp और सोशल लिंक सत्यापित होने के बाद जोड़े जाएँगे।" : "Tell us what you are planning, the service you need and how we can reach you. Contact details such as phone, WhatsApp and social links will be added when verified.")}</p>
     <section className="page-section"><p className="eyebrow"><span/> PROJECT ENQUIRY</p><h2>Tell us the essentials.</h2><form className="enquiry-form service-card" onSubmit={submit}>
       <label>Name<input name="name" required maxLength={120} autoComplete="name"/></label>
       <label>Email<input name="email" type="email" maxLength={254} autoComplete="email"/></label>
