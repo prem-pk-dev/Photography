@@ -958,6 +958,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         site_content: ["page_slug", "draft_json", "published_json", "status", "updated_by", "updated_at", "published_at"],
         site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "changed_by", "created_at"],
         gf_monthly_media_usage: ["month_key", "used_bytes", "updated_at"],
+        gf_media_cleanup_jobs: ["id", "media_id", "project_id", "storage_key", "status", "attempt_count", "last_error_code", "created_at", "updated_at", "completed_at"],
       };
       for (const [table, expected] of Object.entries(required)) {
         const info = await env.DB.prepare("PRAGMA table_info(" + table + ")").all<{ name: string }>();
