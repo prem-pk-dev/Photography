@@ -35,6 +35,7 @@ test("readiness endpoint accepts the required legacy-compatible schema", async (
     site_content: ["page_slug", "draft_json", "published_json", "status", "updated_by", "updated_at", "published_at"],
     site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "changed_by", "created_at"],
     gf_monthly_media_usage: ["month_key", "used_bytes", "updated_at"],
+    gf_media_cleanup_jobs: ["id", "media_id", "project_id", "storage_key", "status", "attempt_count", "last_error_code", "created_at", "updated_at", "completed_at"],
   };
   let adminSetupCompletedAt: string | null = null;
   let existingAdminCount = 0;
@@ -155,6 +156,7 @@ test("readiness endpoint rejects a schema missing the enquiry consent column", a
     site_content: ["page_slug", "draft_json", "published_json", "status", "updated_by", "updated_at", "published_at"],
     site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "changed_by", "created_at"],
     gf_monthly_media_usage: ["month_key", "used_bytes", "updated_at"],
+    gf_media_cleanup_jobs: ["id", "media_id", "project_id", "storage_key", "status", "attempt_count", "last_error_code", "created_at", "updated_at", "completed_at"],
   };
   const db = {
     prepare(query: string) {
@@ -1851,4 +1853,43 @@ test("media deletion records a retryable cleanup failure when Supabase Storage r
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test("readiness endpoint rejects a schema missing the media cleanup ledger", async () => {
+  const schema: Record<string, string[]> = {
+    categories: ["id", "slug", "sort_order", "title_en", "title_hi", "description_en", "description_hi"],
+    projects: ["id", "slug", "category_slug", "cover_image_url", "status", "is_featured", "location", "project_date", "updated_at", "demo_label"],
+    project_translations: ["project_id", "language", "locale", "title", "description", "alt_text"],
+    project_media: ["id", "project_id", "media_type", "preview_url", "original_key", "alt_en", "alt_hi", "sort_order", "is_public"],
+    enquiries: ["id", "name", "email", "phone", "service", "preferred_date", "budget_range", "message", "consent", "status", "created_at", "updated_at"],
+    enquiry_rate_limits: ["ip_hash", "window_start", "request_count"],
+    admin_users: ["id", "email", "password_hash", "password_salt", "role", "is_active", "last_login_at"],
+    customer_users: ["id", "full_name", "email", "phone", "password_hash", "password_salt", "is_active", "created_at", "updated_at", "last_login_at"],
+    customer_sessions: ["id", "customer_user_id", "token_hash", "expires_at", "created_at", "last_seen_at"],
+    admin_sessions: ["id", "admin_user_id", "token_hash", "expires_at"],
+    admin_setup: ["id", "completed_at"],
+    auth_rate_limits: ["rate_key", "window_started_at", "request_count"],
+    audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
+    site_content: ["page_slug", "draft_json", "published_json", "status", "updated_by", "updated_at", "published_at"],
+    site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "changed_by", "created_at"],
+    gf_monthly_media_usage: ["month_key", "used_bytes", "updated_at"],
+  };
+  const db = {
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { return this; },
+        async first<T>() { return null as T | null; },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() {
+          const match = query.match(/PRAGMA table_info\\(([^)]+)\\)/);
+          if (match) return { success: true, results: (schema[match[1]] ?? []).map(name => ({ name })) as T[] };
+          return { success: true, results: [] as T[] };
+        },
+      };
+    },
+  };
+  const response = await worker.fetch(new Request("https://example.test/api/ready"), { DB: db });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "database_schema_incompatible" });
 });
