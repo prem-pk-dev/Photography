@@ -188,9 +188,14 @@ export default function App() {
     const message = "Hello Golden Films, I would like to enquire about a project.\\n\\n" +
       fields.map(([label, value]) => label + ": " + String(value).trim()).join("\\n");
     const whatsappUrl = "https://wa.me/918949800427?text=" + encodeURIComponent(message);
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-    form.reset();
-    setFormStatus("success");
+    const whatsappWindow = window.open(whatsappUrl, "_blank");
+    if (whatsappWindow) {
+      whatsappWindow.opener = null;
+      form.reset();
+      setFormStatus("success");
+    } else {
+      setFormStatus("error");
+    }
   };
 
   const jumpToCategories = (filter: PortfolioGroup | "all" = "all") => {
