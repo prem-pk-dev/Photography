@@ -1,7 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090b0d"><title>Admin Dashboard | Golden Films</title><style>
 :root{color-scheme:dark;--gold:#d8b36a;--muted:#a8a7a1}*{box-sizing:border-box}body{margin:0;background:#090b0d;color:#f7f3eb;font:15px/1.5 system-ui,sans-serif}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px clamp(18px,5vw,60px);border-bottom:1px solid #34332e;background:#111312}.brand{color:var(--gold);letter-spacing:.18em;font-weight:700;font-size:12px}.top a{color:var(--gold)}button{border:1px solid #55472d;background:#1c1a15;color:var(--gold);padding:10px 14px;border-radius:8px;cursor:pointer}.wrap{max-width:1100px;margin:auto;padding:clamp(22px,5vw,56px) 20px}h1{font:500 clamp(32px,5vw,48px)/1.1 Georgia,serif;margin:0 0 10px}.muted{color:var(--muted)}.banner{border:1px solid #50452e;background:#17150f;padding:16px;border-radius:12px;margin:24px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:22px}.tile{border:1px solid #34332e;border-radius:14px;padding:22px;background:#111312}.tile h2{font:500 23px Georgia,serif;margin:0 0 10px}.tile p{color:var(--muted);min-height:48px}.tile a{color:var(--gold)}.status{font-size:14px;color:var(--muted)}.list{margin-top:24px;border:1px solid #34332e;border-radius:12px;padding:18px;overflow-wrap:anywhere}pre{white-space:pre-wrap;word-break:break-word;color:#d7d4cb;font-size:12px}
-</style></head><body><header class="top"><div class="brand">GOLDEN FILMS · ADMIN</div><div><a href="/" style="margin-right:16px">View website ↗</a><button id="logout" hidden>Sign out</button></div></header><main class="wrap"><p class="muted">SECURE WORKSPACE</p><h1>Admin dashboard</h1><p class="muted" id="welcome">Checking your session…</p><div id="banner" class="banner" role="status" aria-live="polite">Verifying authentication with the server.</div><section id="workspace" hidden><div class="grid"><article class="tile"><h2>Website content</h2><p>Review available pages and content status from the authenticated API.</p><a href="#content" id="load-content">Load content pages →</a></article><article class="tile"><h2>Enquiries</h2><p>Enquiry management requires the admin enquiry API and compatible database schema.</p><span class="muted">Backend availability will be checked on request.</span></article><article class="tile"><h2>Preview drafts</h2><p>Open the homepage draft preview after signing in.</p><a href="/?preview=1">Open draft preview →</a></article></div><section id="content" class="list">
+</style></head><body><header class="top"><div class="brand">GOLDEN FILMS · ADMIN</div><div><a href="/" style="margin-right:16px">View website ↗</a><button id="logout" hidden>Sign out</button></div></header><main class="wrap"><p class="muted">SECURE WORKSPACE</p><h1>Admin dashboard</h1><p class="muted" id="welcome">Checking your session…</p><div id="banner" class="banner" role="status" aria-live="polite">Verifying authentication with the server.</div><section id="workspace" hidden><div class="grid"><article class="tile"><h2>Website content</h2><p>Review available pages and content status from the authenticated API.</p><a href="#content" id="load-content">Load content pages →</a></article><article class="tile"><h2>Enquiries</h2><p>Enquiry management requires the admin enquiry API and compatible database schema.</p><span class="muted">Backend availability will be checked on request.</span></article><article class="tile"><h2>Preview drafts</h2><p>Open the homepage draft preview after signing in.</p><a href="/?preview=1">Open draft preview →</a></article></div><section id="projects" class="list">
+<h2>Portfolio Projects</h2>
+<p class="muted">Create portfolio entries using existing MEDIA-ASSETS public URLs. Files are not uploaded here; R2 is not used. New entries are saved as drafts unless an owner explicitly publishes them.</p>
+<div class="grid">
+<label>Project slug<input id="project-slug" placeholder="wedding-story-jaipur" maxlength="80" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Category<select id="project-category" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></select></label>
+<label>Project title (English)<input id="project-title-en" maxlength="120" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Project title (Hindi)<input id="project-title-hi" maxlength="120" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Location (optional)<input id="project-location" maxlength="120" placeholder="Jaipur" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Project date (optional)<input id="project-date" type="date" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label style="grid-column:1/-1">Description (English)<textarea id="project-desc-en" maxlength="2000" rows="3" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></textarea></label>
+<label style="grid-column:1/-1">Description (Hindi)<textarea id="project-desc-hi" maxlength="2000" rows="3" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></textarea></label>
+<label style="grid-column:1/-1">Cover image — choose an existing approved photography asset<select id="project-cover" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></select></label>
+<label><input id="project-featured" type="checkbox"> Mark as featured</label>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><button id="save-project" type="button">Save project as draft</button><button id="refresh-projects" type="button">Refresh projects</button></div>
+<p id="project-status" class="status" role="status" aria-live="polite"></p>
+<h3>Existing projects</h3><div id="project-list" class="muted">Sign in to load projects.</div>
+<div style="border-top:1px solid #34332e;margin-top:22px;padding-top:18px">
+<h3>Add media to a saved project</h3><p class="muted">Add an image/video URL from MEDIA-ASSETS. Keep media private until reviewed; publishing media requires the owner role.</p>
+<div class="grid">
+<label>Project<select id="media-project" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></select></label>
+<label>Media type<select id="media-type" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"><option value="image">Image</option><option value="video">Video</option></select></label>
+<label style="grid-column:1/-1">Media URL<input id="media-url" type="url" placeholder="https://media-assets-4sb.pages.dev/..." style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Alt text (English)<input id="media-alt-en" maxlength="250" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label>Alt text (Hindi)<input id="media-alt-hi" maxlength="250" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+</div>
+<label style="display:block;margin-top:12px"><input id="media-public" type="checkbox"> Mark media public (owner only)</label>
+<button id="add-media" type="button" style="margin-top:14px">Add media URL</button><p id="media-status" class="status" role="status" aria-live="polite"></p>
+</div>
+</section>
+<section id="content" class="list">
 <h2>Content Editor</h2>
 <p class="muted">Edit the English and Hindi copy for each page. Save creates a draft; Publish makes the saved draft public.</p>
 <label for="page-select">Website page</label>
@@ -25,5 +56,64 @@ document.querySelector('#load-content').addEventListener('click',async e=>{e.pre
 document.querySelector('#save-draft').addEventListener('click',async()=>{const content={};for(const [key] of pageFields[pageSelect.value])content[key]=document.querySelector('#field-'+key).value.trim();editorStatus.textContent='Saving draft…';try{const data=await requestJson('/api/admin/content/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:pageSelect.value,content})});editorStatus.textContent='Draft saved for '+data.page+'. It is not public until published.'}catch(err){editorStatus.textContent='Save failed: '+err.message}});
 document.querySelector('#preview-draft').addEventListener('click',async()=>{editorStatus.textContent='Loading draft preview…';try{const data=await requestJson('/api/admin/content/preview?page='+encodeURIComponent(pageSelect.value));editorStatus.textContent='Draft preview loaded for '+data.page+'. Review the API response below.'}catch(err){editorStatus.textContent='Preview failed: '+err.message}});
 document.querySelector('#publish-page').addEventListener('click',async()=>{const hasContent=pageFields[pageSelect.value].some(([key])=>document.querySelector('#field-'+key).value.trim().length>0);if(!hasContent){editorStatus.textContent='Publishing blocked: add page content and save a draft first.';return}if(!confirm('Publish the currently saved draft for “'+pageSelect.value+'”? This makes it public. Save the draft first if you have edited fields.'))return;editorStatus.textContent='Publishing saved draft…';try{const data=await requestJson('/api/admin/content/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:pageSelect.value})});editorStatus.textContent='Published '+data.page+'. Verify the public page before publishing another.';await loadPageDraft()}catch(err){editorStatus.textContent='Publish failed: '+err.message}});
+
+// Portfolio project and URL-based media manager (no R2 upload dependency).
+const MEDIA_BASE='https://media-assets-4sb.pages.dev/';
+const photoAssets=[
+['Wedding garden portrait','images/photography/wedding/wedding-garden-portrait.webp'],
+['Wedding chapel ceremony','images/photography/wedding/wedding-chapel-ceremony.webp'],
+['Wedding reception laughter','images/photography/wedding/wedding-reception-laughter.webp'],
+['Wedding rings bouquet','images/photography/wedding/wedding-rings-bouquet.webp'],
+['Wedding sunset kiss','images/photography/wedding/wedding-sunset-kiss.webp'],
+['Pre-wedding beach walk','images/photography/pre-wedding/prewedding-beach-walk.webp'],
+['Pre-wedding hillside sunset','images/photography/pre-wedding/prewedding-hillside-sunset.webp'],
+['Pre-wedding lakeside picnic','images/photography/pre-wedding/prewedding-lakeside-picnic.webp'],
+['Pre-wedding stringlight portrait','images/photography/pre-wedding/prewedding-stringlight-portrait.webp'],
+['Pre-wedding woodland embrace','images/photography/pre-wedding/prewedding-woodland-embrace.webp'],
+['Portrait golden hour','images/photography/portraits/portrait-golden-hour.webp'],
+['Portrait indoor natural light','images/photography/portraits/portrait-indoor-natural-light.webp'],
+['Portrait monochrome window','images/photography/portraits/portrait-monochrome-window.webp'],
+['Portrait studio classic','images/photography/portraits/portrait-studio-classic.webp'],
+['Portrait urban daylight','images/photography/portraits/portrait-urban-daylight.webp'],
+['Event bridal portrait','images/photography/events/event-bridal-portrait-floral-venue.webp'],
+['Event wedding ceremony couple','images/photography/events/event-wedding-ceremony-couple.webp'],
+['Event wedding couple portrait','images/photography/events/event-wedding-couple-portrait.webp'],
+['Event processional celebration','images/photography/events/event-wedding-processional-celebration.webp'],
+['Event proposal celebration','images/photography/events/event-wedding-proposal-celebration.webp']
+];
+const coverSelect=document.querySelector('#project-cover'),categorySelect=document.querySelector('#project-category'),projectStatus=document.querySelector('#project-status'),projectList=document.querySelector('#project-list'),mediaProject=document.querySelector('#media-project');
+for(const [label,path] of photoAssets){const o=document.createElement('option');o.value=MEDIA_BASE+path;o.textContent=label;coverSelect.appendChild(o)}
+async function loadProjectManager(){
+ projectStatus.textContent='Loading categories and portfolio…';
+ try{
+  const [cats,data]=await Promise.all([fetch('/api/categories?lang=en',{cache:'no-store'}).then(r=>r.json()),requestJson('/api/admin/projects')]);
+  categorySelect.replaceChildren();for(const c of cats.categories||[]){const o=document.createElement('option');o.value=c.slug;o.textContent=c.title_en;categorySelect.appendChild(o)}
+  projectList.replaceChildren();mediaProject.replaceChildren();
+  const projects=data.projects||[];
+  if(!projects.length){projectList.textContent='No portfolio projects yet.'}
+  for(const p of projects){const item=document.createElement('div');item.style.cssText='padding:12px 0;border-bottom:1px solid #34332e';
+   const title=document.createElement('strong');title.textContent=(p.title_en||p.slug)+' · '+p.status;
+   const meta=document.createElement('div');meta.className='muted';meta.textContent=p.category_slug+' · '+p.slug;
+   item.append(title,meta);projectList.appendChild(item);
+   const option=document.createElement('option');option.value=p.id;option.textContent=(p.title_en||p.slug)+' ('+p.status+')';mediaProject.appendChild(option);
+  }
+  projectStatus.textContent='Loaded '+projects.length+' projects and '+(cats.categories||[]).length+' categories. Existing asset URLs are used directly; no R2 upload.';
+ }catch(err){projectStatus.textContent='Could not load projects: '+err.message}
+}
+document.querySelector('#refresh-projects').addEventListener('click',loadProjectManager);
+document.querySelector('#save-project').addEventListener('click',async()=>{
+ const status=document.querySelector('#project-status');const payload={slug:document.querySelector('#project-slug').value.trim(),categorySlug:categorySelect.value,titleEn:document.querySelector('#project-title-en').value.trim(),titleHi:document.querySelector('#project-title-hi').value.trim(),descriptionEn:document.querySelector('#project-desc-en').value.trim(),descriptionHi:document.querySelector('#project-desc-hi').value.trim(),coverImageUrl:coverSelect.value,status:'draft',location:document.querySelector('#project-location').value.trim(),projectDate:document.querySelector('#project-date').value,demoLabel:'Portfolio',isFeatured:document.querySelector('#project-featured').checked};
+ status.textContent='Saving project draft…';
+ try{const data=await requestJson('/api/admin/projects/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});status.textContent='Project saved as draft: '+data.slug+'. It is not public.';await loadProjectManager()}
+ catch(err){status.textContent='Project save failed: '+err.message}
+});
+document.querySelector('#add-media').addEventListener('click',async()=>{
+ const status=document.querySelector('#media-status');const projectId=mediaProject.value;const previewUrl=document.querySelector('#media-url').value.trim();
+ if(!projectId){status.textContent='Save a project first, then select it here.';return}
+ status.textContent='Adding media URL…';
+ try{const data=await requestJson('/api/admin/projects/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId,mediaType:document.querySelector('#media-type').value,previewUrl,altEn:document.querySelector('#media-alt-en').value.trim(),altHi:document.querySelector('#media-alt-hi').value.trim(),sortOrder:0,isPublic:document.querySelector('#media-public').checked})});status.textContent='Media URL added. Public: '+data.isPublic+'.';document.querySelector('#media-url').value=''}
+ catch(err){status.textContent='Media add failed: '+err.message}
+});
+
 renderFields();checkSession();
 </script></body></html>
