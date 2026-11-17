@@ -1213,6 +1213,7 @@ function AdminDashboardPage() {
           </div>
         </article>)}
       </section>
+      <AdminBookingManager />
       <AdminSystemStatus />
       <AdminHomeContentEditor canPublish={adminRole === "owner"} />
       <AdminSecondaryContentEditor canPublish={adminRole === "owner"} />
@@ -1224,6 +1225,116 @@ function AdminDashboardPage() {
       </div>
     </div>}
   </SiteFrame>;
+}
+
+
+type BookingSlot = { id: string; service_slug: string; slot_date: string; starts_at: string; ends_at: string };
+type CustomerBooking = { id: string; service_slug: string; status: string; customer_note: string; admin_note: string; slot_date: string; starts_at: string; ends_at: string; created_at: string };
+const bookingServices = [
+  ["photography","Photography"],["videography","Videography"],["photo-editing","Photo editing"],["video-editing","Video editing"]
+] as const;
+
+function CustomerBookingPage() {
+  const [mode,setMode] = useState<"login"|"register">("register");
+  const [customer,setCustomer] = useState<{full_name:string;email:string}|null>(null);
+  const [name,setName] = useState("");
+  const [email,setEmail] = useState("");
+  const [phone,setPhone] = useState("");
+  const [password,setPassword] = useState("");
+  const [service,setService] = useState("photography");
+  const [from,setFrom] = useState(new Date().toISOString().slice(0,10));
+  const [slots,setSlots] = useState<BookingSlot[]>([]);
+  const [slotId,setSlotId] = useState("");
+  const [note,setNote] = useState("");
+  const [bookings,setBookings] = useState<CustomerBooking[]>([]);
+  const [notice,setNotice] = useState("");
+  const [busy,setBusy] = useState(false);
+  const to = new Date(Date.now()+60*86400000).toISOString().slice(0,10);
+  const loadBookings = async () => {
+    const r = await fetch("/api/customer/bookings",{credentials:"same-origin",cache:"no-store"});
+    if(r.ok){const d=await r.json() as {bookings:CustomerBooking[]};setBookings(d.bookings||[]);}
+  };
+  useEffect(()=>{fetch("/api/customer/session",{credentials:"same-origin"}).then(async r=>r.ok?r.json():null).then(async d=>{if(d?.customer){setCustomer(d.customer);await loadBookings();}}).catch(()=>undefined);},[]);
+  useEffect(()=>{if(!customer)return;fetch("/api/booking/slots?service="+encodeURIComponent(service)+"&from="+from+"&to="+to,{cache:"no-store"}).then(async r=>r.ok?r.json():{slots:[]}).then(d=>{setSlots(d.slots||[]);setSlotId("");}).catch(()=>setSlots([]));},[customer,service,from]);
+  const auth = async (e:FormEvent<HTMLFormElement>) => {
+    e.preventDefault();setBusy(true);setNotice("");
+    try{
+      const r=await fetch("/api/customer/"+mode,{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({fullName:name,email,phone,password})});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||"Account request failed");
+      setCustomer(d.customer);await loadBookings();setNotice("Signed in successfully.");
+    }catch(e){setNotice(e instanceof Error?e.message:"Could not sign in.");}
+    finally{setBusy(false);}
+  };
+  const requestSlot = async (e:FormEvent<HTMLFormElement>) => {
+    e.preventDefault();if(!slotId)return;setBusy(true);setNotice("");
+    try{
+      const r=await fetch("/api/bookings",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({slotId,note})});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||"Booking request failed");
+      setNotice("Request sent. It is Pending and is not confirmed yet.");setNote("");await loadBookings();
+      setSlots(old=>old.filter(s=>s.id!==slotId));setSlotId("");
+    }catch(e){setNotice(e instanceof Error?e.message:"Could not request this slot.");}
+    finally{setBusy(false);}
+  };
+  const logout=async()=>{await fetch("/api/customer/logout",{method:"POST",credentials:"same-origin"});setCustomer(null);setBookings([]);};
+  return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Request a photography slot">
+    <p className="section-subtitle">Choose an available date and time. Your request stays Pending until Golden Films manually confirms it. No online payment is taken.</p>
+    {!customer ? <section className="page-section"><div className="service-card" style={{maxWidth:620}}>
+      <div className="filter-row"><button className={"filter-chip "+(mode==="register"?"active":"")} type="button" onClick={()=>setMode("register")}>Create account</button><button className={"filter-chip "+(mode==="login"?"active":"")} type="button" onClick={()=>setMode("login")}>Sign in</button></div>
+      <form className="enquiry-form" onSubmit={auth}>
+        {mode==="register"&&<><label>Full name<input required minLength={2} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label><label>Phone<input required type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={30}/></label></>}
+        <label>Email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} maxLength={254}/></label>
+        <label>Password<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={12} maxLength={128}/><small>At least 12 characters.</small></label>
+        <button className="button button-gold" disabled={busy}>{busy?"Please wait…":mode==="register"?"Create account":"Sign in"}</button>
+      </form>
+    </div></section> : <>
+      <section className="page-section"><div className="service-card"><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><p className="eyebrow">SIGNED IN</p><h2>{customer.full_name}</h2><p>{customer.email}</p></div><button className="button button-outline" type="button" onClick={logout}>Sign out</button></div></div></section>
+      <section className="page-section"><p className="eyebrow"><span/>REQUEST A SLOT</p><h2>Choose your preferred time</h2>
+        <form className="enquiry-form service-card" onSubmit={requestSlot}>
+          <label>Service<select value={service} onChange={e=>setService(e.target.value)}>{bookingServices.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+          <label>Start date<input type="date" min={new Date().toISOString().slice(0,10)} value={from} onChange={e=>setFrom(e.target.value)}/></label>
+          <label>Available slot<select required value={slotId} onChange={e=>setSlotId(e.target.value)}><option value="">Choose an available slot</option>{slots.map(s=><option key={s.id} value={s.id}>{s.slot_date} · {s.starts_at}–{s.ends_at}</option>)}</select></label>
+          {slots.length===0&&<p className="section-subtitle">No available slots are currently listed for this service and date range. Please check again later.</p>}
+          <label>Notes (optional)<textarea rows={3} maxLength={1000} value={note} onChange={e=>setNote(e.target.value)} placeholder="Location, event details or preferences"/></label>
+          <button className="button button-gold" disabled={busy||!slotId}>{busy?"Sending…":"Request slot (no payment)"}</button>
+        </form>
+      </section>
+      <section className="page-section"><p className="eyebrow"><span/>YOUR REQUESTS</p><h2>Booking status</h2>
+        {bookings.length===0?<p className="section-subtitle">You have not requested a slot yet.</p>:<div className="services-grid">{bookings.map(b=><article className="service-card" key={b.id}><p className="eyebrow">{b.service_slug.replaceAll("-"," ")}</p><h3>{b.slot_date} · {b.starts_at}–{b.ends_at}</h3><p><strong>Status: {b.status.toUpperCase()}</strong></p>{b.customer_note&&<p>{b.customer_note}</p>}{b.admin_note&&<p>Admin note: {b.admin_note}</p>}</article>)}</div>}
+      </section>
+    </>}
+    {notice&&<p className="form-notice" role="status">{notice}</p>}
+  </SiteFrame>;
+}
+
+function AdminBookingManager() {
+  const [bookings,setBookings]=useState<Array<CustomerBooking & {full_name:string;email:string;phone:string}>>([]);
+  const [slots,setSlots]=useState<Array<BookingSlot & {status:string;active_requests:number}>>([]);
+  const [service,setService]=useState("photography");
+  const [date,setDate]=useState(new Date(Date.now()+86400000).toISOString().slice(0,10));
+  const [start,setStart]=useState("10:00");const [end,setEnd]=useState("11:00");
+  const [note,setNote]=useState("");const [message,setMessage]=useState("");
+  const reload=async()=>{const [b,s]=await Promise.all([fetch("/api/admin/bookings",{credentials:"same-origin"}),fetch("/api/admin/slots",{credentials:"same-origin"})]);if(!b.ok||!s.ok)throw new Error("Booking admin API unavailable");const bd=await b.json();const sd=await s.json();setBookings(bd.bookings||[]);setSlots(sd.slots||[]);};
+  useEffect(()=>{void reload().catch(e=>setMessage(e.message));},[]);
+  const addSlot=async(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();setMessage("");try{const r=await fetch("/api/admin/slots",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({serviceSlug:service,date,startsAt:start,endsAt:end})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Slot creation failed");setMessage("Slot added.");await reload();}catch(e){setMessage(e instanceof Error?e.message:"Slot creation failed.");}};
+  const change=async(id:string,status:string)=>{try{const r=await fetch("/api/admin/bookings/status",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({id,status,adminNote:note})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Status update failed");setNote("");setMessage("Booking updated.");await reload();}catch(e){setMessage(e instanceof Error?e.message:"Update failed.");}};
+  const block=async(id:string,status:string)=>{try{const r=await fetch("/api/admin/slots/status",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({id,status})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Slot update failed");await reload();}catch(e){setMessage(e instanceof Error?e.message:"Slot update failed.");}};
+  return <section className="page-section"><p className="eyebrow"><span/>CUSTOMER BOOKINGS</p><h2>Manual slot management</h2>
+    <article className="service-card"><h3>Create an available slot</h3><form className="enquiry-form" onSubmit={addSlot}>
+      <label>Service<select value={service} onChange={e=>setService(e.target.value)}>{bookingServices.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+      <label>Date<input type="date" required min={new Date().toISOString().slice(0,10)} value={date} onChange={e=>setDate(e.target.value)}/></label>
+      <div className="form-grid"><label>Starts at<input type="time" required value={start} onChange={e=>setStart(e.target.value)}/></label><label>Ends at<input type="time" required value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
+      <button className="button button-gold">Add slot</button>
+    </form></article>
+    <h3 style={{marginTop:28}}>Booking requests</h3>
+    {bookings.length===0?<p className="section-subtitle">No booking requests yet.</p>:bookings.map(b=><article className="service-card" key={b.id} style={{marginTop:14}}>
+      <p className="eyebrow">{b.status.toUpperCase()} · {b.service_slug}</p><h3>{b.full_name}</h3><p>{b.email} · {b.phone}</p><p>{b.slot_date} · {b.starts_at}–{b.ends_at}</p>{b.customer_note&&<p>{b.customer_note}</p>}
+      <label>Admin note<input value={note} onChange={e=>setNote(e.target.value)} maxLength={1000} placeholder="Optional response note"/></label>
+      <div className="filter-row" style={{marginTop:12}}>{b.status==="pending"?<><button className="button button-gold" onClick={()=>void change(b.id,"confirmed")}>Confirm</button><button className="button button-outline" onClick={()=>void change(b.id,"rejected")}>Reject</button></>:<button className="button button-outline" onClick={()=>void change(b.id,"cancelled")}>Cancel booking</button>}</div>
+    </article>)}
+    <h3 style={{marginTop:28}}>Available slots</h3>
+    {slots.map(s=><article className="service-card" key={s.id} style={{marginTop:10,display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><span>{s.service_slug} · {s.slot_date} · {s.starts_at}–{s.ends_at} · {s.status} · {s.active_requests} active</span>{s.status==="available"?<button className="button button-outline" onClick={()=>void block(s.id,"blocked")}>Block</button>:<button className="button button-outline" onClick={()=>void block(s.id,"available")}>Unblock</button>}</article>)}
+    {message&&<p className="form-notice" role="status">{message}</p>}
+  </section>;
 }
 
 type PublicProject = {
@@ -1276,6 +1387,7 @@ function PortfolioPageContent() {
 
 export default function Pages() {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
+  if (path === "/book") return <CustomerBookingPage />;
   if (path === "/portfolio") return <PortfolioPageContent />;
   if (path === "/services") return <ServicesContentPage />;
   if (path === "/about") return <AboutContentPage />;
