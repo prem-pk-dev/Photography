@@ -569,7 +569,8 @@ function ContactContentPage() {
   const language = getSiteLanguage();
   const allowedServices = [{ value: "photography", label: "Photography" }, { value: "videography", label: "Videography" }, { value: "photo-editing", label: "Photo editing" }, { value: "video-editing", label: "Video editing" }];
   const requestedService = new URLSearchParams(window.location.search).get("service") || "";
-  const [service, setService] = useState(allowedServices.some(item => item.value === requestedService) ? requestedService : "");
+  const normalizedRequestedService = requestedService.trim().toLowerCase();
+  const [service, setService] = useState(allowedServices.find(item => item.value === normalizedRequestedService || item.label.toLowerCase() === normalizedRequestedService)?.value || "");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState("");
   const submit = async (event: FormEvent<HTMLFormElement>) => {
