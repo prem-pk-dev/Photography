@@ -370,24 +370,16 @@ export default function App() {
             <div className="contact-info-card"><span className="contact-info-icon"><MessageCircle size={21} /></span><div><strong>{language === "en" ? "Contact details" : "संपर्क विवरण"}</strong><p>{t.contactDetails}</p></div></div>
             <div className="contact-methods"><a href="https://wa.me/918949800427" target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a><a href="tel:+918949800427"><Check size={14} /> +91 89498 00427</a><a href="mailto:prem92006@gmail.com"><Send size={14} /> prem92006@gmail.com</a></div>
           </div>
-          <form className="enquiry-form" onSubmit={handleEnquirySubmit}>
-            <div className="form-heading"><span className="eyebrow">{t.formHeading}</span><span className="form-preview-pill">{t.formConnected}</span></div>
-            <label aria-hidden="true" style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>Leave this field empty<input name="website" type="text" tabIndex={-1} autoComplete="off" /></label>
-            <div className="form-grid">
-              <label>{t.formName}<input name="name" placeholder={language === "en" ? "Your full name" : "आपका पूरा नाम"} required /></label>
-              <label>{t.formEmail}<input name="email" type="email" placeholder="you@example.com" /></label>
-              <label>{t.formPhone}<input name="phone" type="tel" placeholder="+91 ..." /></label>
-              <label>{t.formService}<select name="service" defaultValue="" required><option value="" disabled>{t.formChoose}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.title[language]}</option>)}</select></label>
-              <label>{t.formDate}<input name="date" type="date" /></label>
-              <label>{t.formBudget}<select name="budget" defaultValue=""><option value="">{language === "en" ? "Select range" : "सीमा चुनें"}</option><option value="undecided">{language === "en" ? "To be discussed" : "बातचीत के अनुसार"}</option><option value="small">{language === "en" ? "Budget-friendly" : "कम बजट"}</option><option value="custom">{language === "en" ? "Custom project" : "कस्टम प्रोजेक्ट"}</option></select></label>
-              <label className="form-full">{t.formMessage}<textarea name="message" rows={4} placeholder={language === "en" ? "Share the details you already know..." : "जो जानकारी उपलब्ध है, वह लिखें..."} required /></label>
-              <label className="consent-check form-full"><input name="consent" type="checkbox" required /><span>{t.consentLabel}</span></label>
+          <div className="enquiry-form service-card" role="status">
+            <div className="form-heading"><span className="eyebrow">{t.formHeading}</span><span className="form-preview-pill">{language === "en" ? "Direct contact" : "सीधा संपर्क"}</span></div>
+            <h3>{language === "en" ? "Enquiry form temporarily unavailable" : "Enquiry फॉर्म फिलहाल उपलब्ध नहीं है"}</h3>
+            <p className="section-subtitle">{language === "en" ? "Please contact Golden Films directly. We will confirm availability, scope and pricing before accepting any booking." : "कृपया Golden Films से सीधे संपर्क करें। किसी भी बुकिंग को स्वीकार करने से पहले उपलब्धता, काम और कीमत की पुष्टि की जाएगी।"}</p>
+            <div className="contact-methods">
+              <a href="https://wa.me/918949800427" target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a>
+              <a href="tel:+918949800427"><Check size={14} /> +91 89498 00427</a>
+              <a href="mailto:prem92006@gmail.com"><Send size={14} /> prem92006@gmail.com</a>
             </div>
-            <button className="button button-gold form-submit" type="submit" disabled={formStatus === "sending"}>{formStatus === "sending" ? t.formSending : t.formSubmit}<Send size={16} /></button>
-            {formStatus === "success" && <p className="form-notice" role="status">{t.formNotice}</p>}
-            {formStatus === "contact-required" && <p className="form-notice" role="alert">{t.formRequiredContact}</p>}
-            {formStatus === "error" && <p className="form-notice" role="alert">{t.formError}</p>}
-          </form>
+          </div>
         </section>
       </main>
 
