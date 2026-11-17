@@ -32,6 +32,11 @@ test("readiness endpoint accepts the required legacy-compatible schema", async (
     audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
     site_content: ["page_slug", "draft_json", "published_json", "status", "updated_at"],
     site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "created_at"],
+    customer_accounts: ["id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active"],
+    customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
+    booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
+    bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
+    booking_rate_limits: ["rate_key", "window_started_at", "request_count"],
   };
   const db = {
     prepare(query: string) {
@@ -67,6 +72,11 @@ test("readiness endpoint rejects a schema missing the enquiry consent column", a
     audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
     site_content: ["page_slug", "draft_json", "published_json", "status", "updated_at"],
     site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "created_at"],
+    customer_accounts: ["id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active"],
+    customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
+    booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
+    bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
+    booking_rate_limits: ["rate_key", "window_started_at", "request_count"],
   };
   const db = {
     prepare(query: string) {
