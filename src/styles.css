@@ -188,6 +188,8 @@ img { display: block; max-width: 100%; }
 .contact-info-card p { margin: 6px 0 0; color: #96999a; font-size: 10px; line-height: 1.7; }
 .contact-methods { display: flex; flex-wrap: wrap; gap: 11px 16px; margin-top: 19px; }
 .contact-methods span { display: flex; align-items: center; gap: 5px; color: #bbbfc0; font-size: 10px; }
+.contact-methods a { display: inline-flex; align-items: center; gap: 5px; color: #bbbfc0; font-size: 10px; text-decoration: none; transition: color .2s ease; }
+.contact-methods a:hover, .contact-methods a:focus-visible { color: var(--gold); }
 .contact-methods svg { color: var(--gold); }
 .enquiry-form { padding: 25px; background: linear-gradient(145deg, #15191b, #0d0f10); border: 1px solid var(--line); }
 .form-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
