@@ -1,49 +1,54 @@
 # Cloudflare Deployment Readiness
 
-Last checked: 2026-10-28
+Last checked: 2026-11-17 (IST)
 
-## Current status
+## Verified production state
 
 - Cloudflare Pages project: `golden-films`
-- Expected Pages hostname: `https://golden-films.pages.dev`
+- Production URL: https://golden-films.pages.dev
 - Production branch: `main`
 - Build command: `npm run build`
 - Build output directory: `dist`
-- Repository root: `/`
-- Latest deployment: none at last check
-- The GitHub Actions CI workflow on `main` passed after the latest origin-policy test merge.
-- The Cloudflare project exists, but its Git source integration previously returned HTTP 401. Do not treat the hostname as live until a deployment is visible and the site is smoke-tested.
+- Public site and the contact and booking routes are deployed and respond over HTTPS.
+- `GET /api/health` was verified: HTTP 200 with `{"status":"ok","service":"golden-films-api"}`.
+- `GET /api/ready` was verified: HTTP 503. Production D1 does not satisfy the current Worker schema contract.
+- Contact details currently shown are temporary: phone/WhatsApp `+91 89498 00427`, email `prem92006@gmail.com`.
+- Portfolio and showreel visuals are explicitly demo/sample material; real client work, approved biography and real film links are still required before presenting them as a completed client portfolio.
 
-## Unblock Git integration
+## Launch decision
 
-1. Sign in to the Cloudflare dashboard using the account that owns the `golden-films` Pages project.
-2. Open **Workers & Pages → golden-films → Settings → Builds & deployments** (dashboard wording may vary).
-3. Check whether a Git provider/repository is connected. If the source connection is missing or unauthorized, reconnect GitHub and authorize the account/repository `pkdiv6548/Photography`.
-4. Confirm production branch is `main`, build command is `npm run build`, build output directory is `dist`, and root directory is `/`.
-5. Trigger a deployment from `main`. Wait for the build and deployment to complete successfully.
-6. Verify the deployment appears under Deployments and the production URL serves the site. A project/subdomain existing by itself is not proof of a live deployment.
+**Status: NOT READY FOR FULL PRODUCTION HANDOVER.**
 
-## Post-deploy smoke checks
+The public pages are deployed, but database-backed enquiry, customer booking and admin/CMS flows are not approved for production use while `/api/ready` returns 503. Do not describe these flows as operational or accept real customer submissions until end-to-end verification succeeds.
 
-- Open the production hostname over HTTPS and confirm the portfolio renders without a blank page or asset 404s.
-- Check `GET /api/health` returns HTTP 200 and `{"status":"ok","service":"golden-films-api"}`.
-- Check `GET /api/ready`. A 503 `database_schema_incompatible` is an expected blocker until the legacy D1 schema has been safely migrated; do not bypass this readiness gate.
-- Confirm API and static asset responses include security headers.
-- Do not submit a real enquiry until the schema is verified. Use test data only after the database migration has been validated.
+A limited visual preview can be reviewed with the client, provided demo portfolio material is clearly identified and booking/enquiry persistence is not represented as working. Direct phone, WhatsApp and email contact details are visible on the contact page.
+
+## Required release gates
+
+1. Resolve the legacy D1 schema mismatch through a verified backup and isolated restore/migration rehearsal.
+2. Preserve existing category IDs/slugs/order, English/Hindi translations, foreign keys, enquiry data, admin/auth/settings records and existing media references.
+3. Confirm the exact production database identity and data counts immediately before any approved migration.
+4. Obtain explicit approval before production D1 writes/migrations or any write-capable Worker rollout.
+5. Verify `/api/ready` returns HTTP 200 and the expected ready schema.
+6. Run controlled end-to-end tests for enquiry submission, customer registration/login, slot selection, booking request, admin login, booking review and CMS operations. Use test data only.
+7. Verify both English and Hindi routes, mobile layouts, all navigation, contact links, form validation/error/success states, image loading and security headers.
+8. Replace demo/sample portfolio assets and placeholder biography/showreel content with client-approved material, or retain clear demo labels for a preview-only handover.
+9. Confirm the final phone, WhatsApp and email details with the client; current details are temporary.
+10. Record final smoke-test evidence and obtain client acceptance before the client launches.
 
 ## D1 safety gate — mandatory
 
-The configured `golden-films-db` contains a legacy schema that does not match the current Worker contract. The Wrangler config points to that existing database. Do **not** run `wrangler d1 migrations apply`, execute DDL/DML, or deploy a write-capable Worker against it until all of the following are complete:
+The configured `golden-films-db` is an existing legacy database and does not match the current Worker contract. Wrangler configuration points at this production database. Do **not** run `wrangler d1 migrations apply`, execute DDL/DML, or deploy a write-capable Worker against it until all of the following are complete:
 
 1. Export the intended database and verify the export completed.
 2. Restore the export into a disposable database or equivalent isolated SQLite fixture.
-3. Review and test the forward migration against that disposable copy.
+3. Review and test the exact forward migration against that disposable copy.
 4. Verify category IDs/slugs/order and English/Hindi translations are preserved.
 5. Verify foreign keys, nullable `enquiries.email`, and all admin/auth/settings tables and data.
 6. Recheck live counts and database identity immediately before any approved migration.
-7. Keep a rollback plan and do not invent consent or object-storage keys during mapping.
+7. Keep a rollback plan; do not invent consent values or object-storage keys during mapping.
 
-The read-only verifier at `scripts/verify-d1-migration.sql` is a checklist of queries, not a migration and not evidence that a restore has already passed.
+The read-only verifier at `scripts/verify-d1-migration.sql` is a checklist of queries, not a migration and not evidence that a restore has passed.
 
 ## Budget and credentials
 
