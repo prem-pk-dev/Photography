@@ -50,4 +50,4 @@ export const projects: DemoProject[] = [
   { id: "creative-cut", group: "editing", title: { en: "The Final Cut", hi: "फाइनल कट" }, category: { en: "Video Editing & Color Grading", hi: "वीडियो एडिटिंग और कलर ग्रेडिंग" }, image: unsplash("photo-1574717024653-61fd2cf4d44d", 1100), imageAlt: { en: "Editing workspace — demo portfolio image", hi: "एडिटिंग वर्कस्पेस — डेमो पोर्टफोलियो इमेज" }, featured: true }
 ];
 
-export const heroImage = unsplash("photo-1537633552985-df8429e8048b", 1800);
+export const heroImage = "https://media-assets-4sb.pages.dev/images/photography/wedding/wedding-sunset-kiss.webp";
