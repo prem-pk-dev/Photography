@@ -8,7 +8,7 @@ import { categories, heroImage, projects, type Language, type PortfolioGroup } f
 
 const copy = {
   en: {
-    nav: ["Home", "Portfolio", "Services", "About", "Showreel", "Contact"],
+    nav: ["Home", "Portfolio", "Services", "About", "Showreel", "Contact", "Book a slot"],
     eyebrow: "PHOTOGRAPHY · FILMMAKING · EDITING",
     heroTitle: "Moments into timeless stories.",
     heroText: "Photography, cinematic films and thoughtful editing for the moments and brands that matter.",
@@ -64,7 +64,7 @@ const copy = {
     allRights: "All sample projects and images are for demonstration only."
   },
   hi: {
-    nav: ["होम", "पोर्टफोलियो", "सेवाएँ", "परिचय", "शो-रील", "संपर्क"],
+    nav: ["होम", "पोर्टफोलियो", "सेवाएँ", "परिचय", "शो-रील", "संपर्क", "स्लॉट बुक करें"],
     eyebrow: "फोटोग्राफी · फिल्ममेकिंग · एडिटिंग",
     heroTitle: "पलों को यादगार कहानियों में बदलें।",
     heroText: "खास पलों और ब्रांड्स के लिए फोटोग्राफी, सिनेमैटिक फिल्में और बेहतरीन एडिटिंग।",
@@ -226,7 +226,7 @@ export default function App() {
         </button>
         <nav className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
           {t.nav.map((label, index) => {
-            const routes = ["/", "/portfolio", "/services", "/about", "/showreel", "/contact"];
+            const routes = ["/", "/portfolio", "/services", "/about", "/showreel", "/contact", "/book"];
             return <a key={routes[index]} href={routes[index]} onClick={() => setMenuOpen(false)}>{label}</a>;
           })}
           <a className="admin-nav-link" href="/login.html" onClick={() => setMenuOpen(false)}>{language === "en" ? "Admin Login" : "एडमिन लॉगिन"}</a>
