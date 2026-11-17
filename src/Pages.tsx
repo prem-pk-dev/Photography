@@ -587,10 +587,17 @@ function ContactContentPage() {
       "Project details: " + payload.message
     ].filter(Boolean).join("\\n");
     const whatsappUrl = "https://wa.me/918949800427?text=" + encodeURIComponent(message);
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-    form.reset(); setService(""); setResult(language === "hi"
-      ? "आपकी enquiry का मैसेज WhatsApp में तैयार है। जाँचकर WhatsApp में Send दबाएँ।"
-      : "WhatsApp opened with your enquiry details. Review the message and tap Send in WhatsApp.");
+    const whatsappWindow = window.open(whatsappUrl, "_blank");
+    if (whatsappWindow) {
+      whatsappWindow.opener = null;
+      form.reset(); setService(""); setResult(language === "hi"
+        ? "आपकी enquiry का मैसेज WhatsApp में तैयार है। जाँचकर WhatsApp में Send दबाएँ।"
+        : "WhatsApp opened with your enquiry details. Review the message and tap Send in WhatsApp.");
+    } else {
+      setResult(language === "hi"
+        ? "WhatsApp नहीं खुला। कृपया ऊपर दिए गए WhatsApp लिंक से सीधे संपर्क करें।"
+        : "WhatsApp did not open. Please use the direct WhatsApp link above.");
+    }
     setSending(false);
   };
   return <SiteFrame eyebrow="LET'S MAKE SOMETHING MEANINGFUL" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "संपर्क और प्रोजेक्ट पूछताछ" : "Contact & Project Enquiry")}>
