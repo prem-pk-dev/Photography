@@ -578,30 +578,37 @@ function ContactContentPage() {
     const payload = { name:String(data.get("name")||"").trim(), email:String(data.get("email")||"").trim(), phone:String(data.get("phone")||"").trim(), service, message:String(data.get("message")||"").trim(), consent:data.get("consent")==="on" };
     if (!payload.email && !payload.phone) { setResult("Please provide an email address or phone number."); return; }
     setSending(true); setResult("");
-    try {
-      const response = await fetch("/api/enquiries", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
-      const body = await response.json().catch(()=>({}));
-      if (!response.ok) throw new Error(body.error || "submit_failed");
-      form.reset(); setService(""); setResult("Thank you—your enquiry was submitted.");
-    } catch { setResult("The enquiry could not be submitted. Please try again later; no success has been assumed."); }
-    finally { setSending(false); }
+    const message = [
+      "Hello Golden Films, I would like to enquire about a project.",
+      "Name: " + payload.name,
+      payload.email ? "Email: " + payload.email : "",
+      payload.phone ? "Phone: " + payload.phone : "",
+      "Service: " + (allowedServices.find(item => item.value === service)?.label || service),
+      "Project details: " + payload.message
+    ].filter(Boolean).join("\\n");
+    const whatsappUrl = "https://wa.me/918949800427?text=" + encodeURIComponent(message);
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    form.reset(); setService(""); setResult(language === "hi"
+      ? "आपकी enquiry का मैसेज WhatsApp में तैयार है। जाँचकर WhatsApp में Send दबाएँ।"
+      : "WhatsApp opened with your enquiry details. Review the message and tap Send in WhatsApp.");
+    setSending(false);
   };
   return <SiteFrame eyebrow="LET'S MAKE SOMETHING MEANINGFUL" title={(language === "hi" ? content.titleHi : content.titleEn) || (language === "hi" ? "संपर्क और प्रोजेक्ट पूछताछ" : "Contact & Project Enquiry")}>
     <p className="section-subtitle">{(language === "hi" ? content.textHi : content.textEn) || (language === "hi" ? "आप क्या योजना बना रहे हैं, कौन-सी सेवा चाहिए और आपसे कैसे संपर्क किया जाए—यह जानकारी साझा करें। फोन/WhatsApp: +91 89498 00427 और ईमेल: prem92006@gmail.com। ये विवरण अस्थायी हैं और बाद में बदले जा सकते हैं।" : "Tell us what you are planning, the service you need and how we can reach you. Call or WhatsApp +91 89498 00427, or email prem92006@gmail.com. These details are temporary and can be updated later.")}</p>
-    <section className="page-section"><p className="eyebrow"><span/> PROJECT ENQUIRY</p><h2>Tell us the essentials.</h2><form className="enquiry-form service-card" onSubmit={submit}>
+    <section className="page-section"><p className="eyebrow"><span/> PROJECT ENQUIRY · WHATSAPP</p><h2>Prepare your enquiry.</h2><form className="enquiry-form service-card" onSubmit={submit}>
       <label>Name<input name="name" required maxLength={120} autoComplete="name"/></label>
       <label>Email<input name="email" type="email" maxLength={254} autoComplete="email"/></label>
       <label>Phone / WhatsApp<input name="phone" type="tel" maxLength={40} autoComplete="tel"/></label>
       <label>Service<select value={service} onChange={e=>setService(e.target.value)} required><option value="">Choose a service</option>{allowedServices.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <label>Project details<textarea name="message" required minLength={10} maxLength={3000} rows={6} placeholder="Date, location, project goals, deliverables and budget range…"/></label>
       <label className="consent-row"><input type="checkbox" name="consent" required/> I agree that Golden Films may use these details to respond to my enquiry.</label>
-      <button className="button button-gold" type="submit" disabled={sending}>{sending?"Sending enquiry…":"Send enquiry"} <ArrowRight size={15}/></button>
+      <button className="button button-gold" type="submit" disabled={sending}>{sending?"Sending enquiry…":"Continue in WhatsApp"} <ArrowRight size={15}/></button>
       {result&&<p className="form-notice" role="status">{result}</p>}
     </form></section>
     <section className="page-section"><p className="eyebrow"><span/> WHAT HAPPENS NEXT</p><div className="services-grid">{[["01","We review the brief","We use your details only to understand and respond to the request."],["02","We clarify the scope","Date, location, deliverables and schedule can be confirmed before any commitment."],["03","We agree the next step","Availability, quote and delivery expectations need confirmation before booking."]].map(([n,t,d])=><article className="service-card" key={n}><p className="eyebrow">{n}</p><h3>{t}</h3><p>{d}</p></article>)}</div></section>
     <section className="page-section"><p className="eyebrow"><span/> BEFORE YOU SEND</p><h2>Helpful details to include.</h2><p className="section-subtitle">Include your event date, venue or location, approximate hours, desired style, deadline, usage (personal or commercial) and the formats you need.</p></section>
     <section className="page-section"><p className="eyebrow"><span/> {language === "hi" ? "सीधे संपर्क करें" : "DIRECT CONTACT"}</p><h2>{language === "hi" ? "Golden Films से संपर्क करें" : "Contact Golden Films"}</h2><div className="services-grid"><a className="service-card" href="tel:+918949800427"><h3>{language === "hi" ? "फोन करें" : "Call us"}</h3><p>+91 89498 00427</p></a><a className="service-card" href="https://wa.me/918949800427" target="_blank" rel="noopener noreferrer"><h3>WhatsApp</h3><p>+91 89498 00427</p></a><a className="service-card" href="mailto:prem92006@gmail.com"><h3>{language === "hi" ? "ईमेल" : "Email"}</h3><p>prem92006@gmail.com</p><small>{language === "hi" ? "अस्थायी ईमेल — बाद में बदला जा सकता है।" : "Temporary email — can be changed later."}</small></a></div><p className="section-subtitle">{language === "hi" ? "Instagram, Facebook और YouTube के लिंक फिलहाल डेमो/प्लेसहोल्डर नहीं बनाए गए हैं, ताकि किसी गलत अकाउंट पर उपयोगकर्ता न जाएँ। एडमिन पैनल तैयार होने पर सही लिंक जोड़ें।" : "Instagram, Facebook and YouTube links are not fabricated. Add the correct profiles from the admin panel when available."}</p></section>
-    <section className="page-section"><p className="eyebrow"><span/> PRIVACY</p><h2>Your enquiry should be handled carefully.</h2><p className="section-subtitle">Please do not submit passwords, payment card information or unrelated sensitive details. The form reports an error if the server does not confirm receipt.</p></section>
+    <section className="page-section"><p className="eyebrow"><span/> PRIVACY</p><h2>Your enquiry should be handled carefully.</h2><p className="section-subtitle">Please do not submit passwords, payment card information or unrelated sensitive details. The form prepares a WhatsApp message; it is not submitted until you review and tap Send in WhatsApp.</p></section>
     <section className="page-section"><p className="eyebrow"><span/> OTHER WAYS TO EXPLORE</p><div className="services-grid"><a className="service-card" href="/services"><h3>Explore services <ArrowRight size={15}/></h3><p>Compare photography, video and editing options.</p></a><a className="service-card" href="/portfolio"><h3>Browse portfolio <ArrowRight size={15}/></h3><p>See categories and sample visuals, clearly labelled as demos.</p></a></div></section>
   </SiteFrame>;
 }
