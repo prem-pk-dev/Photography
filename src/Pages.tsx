@@ -4,7 +4,7 @@ import { categories, projects } from "./data";
 
 const nav = [
   ["Home", "/"], ["Portfolio", "/portfolio"], ["Services", "/services"],
-  ["About", "/about"], ["Showreel", "/showreel"], ["Contact", "/contact"]
+  ["About", "/about"], ["Showreel", "/showreel"], ["Contact", "/contact"], ["Book a slot", "/book"]
 ];
 
 function getSiteLanguage(): "en" | "hi" {
