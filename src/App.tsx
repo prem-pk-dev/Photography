@@ -37,7 +37,7 @@ const copy = {
     previewOnly: "Preview only",
     contactEyebrow: "LET'S MAKE SOMETHING MEANINGFUL",
     contactTitle: "Tell us about your story.",
-    contactText: "Send your project details through the enquiry form. Submissions are stored securely once the live backend is configured.",
+    contactText: "Send your project details through the enquiry form, or contact us directly by phone, WhatsApp or email.",
     formName: "Your name",
     formEmail: "Email address",
     formPhone: "Phone / WhatsApp",
@@ -49,13 +49,13 @@ const copy = {
     formSubmit: "Send enquiry",
     formSending: "Sending…",
     formHeading: "PROJECT ENQUIRY",
-    formConnected: "Secure submission",
+    formConnected: "Project enquiry",
     formNotice: "Your enquiry was received. We will get back to you.",
     formError: "We could not send your enquiry. Please try again later or contact us another way.",
     formRequiredContact: "Please enter an email address or phone number.",
     consentRequired: "Please confirm that we may use these details to respond to your enquiry.",
     consentLabel: "I agree that Golden Films may use the details above to respond to my enquiry.",
-    contactDetails: "Sunil's phone, WhatsApp, email and Instagram details will be connected before launch.",
+    contactDetails: "Call or WhatsApp: +91 80498 00427 · Email: prem92006@gmail.com",
     footerLine: "Capturing moments. Crafting memories.",
     quickLinks: "Explore",
     services: "Services",
@@ -93,7 +93,7 @@ const copy = {
     previewOnly: "केवल प्रीव्यू",
     contactEyebrow: "आइए कुछ खास बनाएँ",
     contactTitle: "अपनी कहानी के बारे में बताएँ।",
-    contactText: "अपने प्रोजेक्ट की जानकारी enquiry form के ज़रिए भेजें। लाइव बैकएंड कॉन्फ़िगर होने पर आपकी जानकारी सुरक्षित रूप से सेव होगी।",
+    contactText: "अपने प्रोजेक्ट की जानकारी enquiry form से भेजें या फोन, WhatsApp अथवा ईमेल पर सीधे संपर्क करें।",
     formName: "आपका नाम",
     formEmail: "ईमेल पता",
     formPhone: "फोन / WhatsApp",
@@ -105,13 +105,13 @@ const copy = {
     formSubmit: "Enquiry भेजें",
     formSending: "भेज रहे हैं…",
     formHeading: "प्रोजेक्ट की पूछताछ",
-    formConnected: "सुरक्षित सबमिशन",
+    formConnected: "प्रोजेक्ट enquiry",
     formNotice: "आपकी enquiry मिल गई है। हम आपसे संपर्क करेंगे।",
     formError: "Enquiry नहीं भेजी जा सकी। कृपया फिर कोशिश करें या दूसरे तरीके से संपर्क करें।",
     formRequiredContact: "कृपया ईमेल पता या फोन नंबर दर्ज करें।",
     consentRequired: "कृपया पुष्टि करें कि हम आपकी enquiry का जवाब देने के लिए इन विवरणों का उपयोग कर सकते हैं।",
     consentLabel: "मैं सहमत हूँ कि Golden Films मेरी enquiry का जवाब देने के लिए ऊपर दिए गए विवरणों का उपयोग कर सकता है।",
-    contactDetails: "सुनील के फोन, WhatsApp, ईमेल और Instagram विवरण वेबसाइट लाइव होने से पहले जोड़े जाएँगे।",
+    contactDetails: "फोन या WhatsApp: +91 80498 00427 · ईमेल: prem92006@gmail.com",
     footerLine: "पलों को सँजोना। यादें बनाना।",
     quickLinks: "लिंक",
     services: "सेवाएँ",
@@ -368,7 +368,7 @@ export default function App() {
           <div className="contact-copy">
             <p className="eyebrow">{t.contactEyebrow}</p><h2>{t.contactTitle}</h2><p>{t.contactText}</p>
             <div className="contact-info-card"><span className="contact-info-icon"><MessageCircle size={21} /></span><div><strong>{language === "en" ? "Contact details" : "संपर्क विवरण"}</strong><p>{t.contactDetails}</p></div></div>
-            <div className="contact-methods"><span><Check size={14} /> WhatsApp</span><span><Check size={14} /> Phone</span><span><Check size={14} /> Email</span><span><Check size={14} /> Instagram</span></div>
+            <div className="contact-methods"><a href="https://wa.me/918049800427" target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a><a href="tel:+918049800427"><Check size={14} /> +91 80498 00427</a><a href="mailto:prem92006@gmail.com"><Send size={14} /> prem92006@gmail.com</a></div>
           </div>
           <form className="enquiry-form" onSubmit={handleEnquirySubmit}>
             <div className="form-heading"><span className="eyebrow">{t.formHeading}</span><span className="form-preview-pill">{t.formConnected}</span></div>
@@ -395,7 +395,7 @@ export default function App() {
         <div className="footer-brand"><a className="brand" href="#home"><span className="brand-mark"><Aperture size={25} /></span><span className="brand-copy"><strong>GOLDEN <em>FILMS</em></strong><small>PHOTOGRAPHY · FILMS · EDITING</small></span></a><p>{t.footerLine}</p><span className="footer-demo"><Sparkles size={13} /> {t.demo}</span></div>
         <div className="footer-column"><h3>{t.quickLinks}</h3><a href="#home">{t.nav[0]}</a><a href="#categories">{t.nav[1]}</a><a href="#featured">{t.featuredTitle}</a><a href="#about">{t.nav[3]}</a></div>
         <div className="footer-column"><h3>{t.services}</h3>{services.map((item) => <button type="button" key={item.id} onClick={() => jumpToCategories(item.id.includes("editing") ? "editing" : item.id as PortfolioGroup)}>{item.title[language]}</button>)}</div>
-        <div className="footer-column"><h3>{t.contact}</h3><a href="#contact">{t.contactSunil}</a><a href="#contact">WhatsApp · Phone</a><a href="#contact">Email · Instagram</a><span className="footer-muted">{language === "en" ? "Official details will be added before launch." : "लाइव करने से पहले असली विवरण जोड़े जाएँगे।"}</span></div>
+        <div className="footer-column"><h3>{t.contact}</h3><a href="#contact">{t.contactSunil}</a><a href="https://wa.me/918049800427" target="_blank" rel="noreferrer">WhatsApp · +91 80498 00427</a><a href="tel:+918049800427">Call us</a><a href="mailto:prem92006@gmail.com">prem92006@gmail.com</a><span className="footer-muted">{language === "en" ? "Contact details are temporary and can be updated later." : "ये संपर्क विवरण अभी अस्थायी हैं और बाद में बदले जा सकते हैं।"}</span></div>
         <div className="footer-column"><h3>{language === "en" ? "Admin" : "एडमिन"}</h3><a href="/login.html">{language === "en" ? "Admin login" : "एडमिन लॉगिन"}</a><a href="/register.html">{language === "en" ? "Owner setup" : "ओनर सेटअप"}</a><a href="/admin.html">{language === "en" ? "Dashboard" : "डैशबोर्ड"}</a><span className="footer-muted">{language === "en" ? "Owner setup requires the private setup secret." : "ओनर सेटअप के लिए निजी सेटअप सीक्रेट ज़रूरी है।"}</span></div>
         <div className="footer-bottom"><span>© {new Date().getFullYear()} Golden Films</span><span>{t.allRights}</span><a href="#home">Back to top ↑</a></div>
       </footer>
