@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Aperture, ArrowDownRight, ArrowRight, Camera, Check, Clapperboard,
   Film, Image as ImageIcon, Languages, Menu, MessageCircle, Play, Send, Sparkles,
@@ -134,7 +134,6 @@ export default function App() {
   const [language, setLanguage] = useState<Language>("en");
   const [activeFilter, setActiveFilter] = useState<PortfolioGroup | "all">("all");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [formStatus, setFormStatus] = useState<"idle" | "sending" | "success" | "error" | "contact-required">("idle");
   const [siteContent, setSiteContent] = useState<Record<string, string>>({});
   const isDraftPreview = new URLSearchParams(window.location.search).get("preview") === "1";
   useEffect(() => {
@@ -166,37 +165,6 @@ export default function App() {
     () => activeFilter === "all" ? categories : categories.filter((item) => item.group === activeFilter),
     [activeFilter]
   );
-
-  const handleEnquirySubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (formStatus === "sending") return;
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    if (!data.get("email")?.toString().trim() && !data.get("phone")?.toString().trim()) {
-      setFormStatus("contact-required");
-      return;
-    }
-    const fields = [
-      ["Name", data.get("name")],
-      ["Email", data.get("email")],
-      ["Phone", data.get("phone")],
-      ["Service", data.get("service")],
-      ["Event date", data.get("date")],
-      ["Budget", data.get("budget")],
-      ["Project details", data.get("message")],
-    ].filter(([, value]) => String(value ?? "").trim());
-    const message = "Hello Golden Films, I would like to enquire about a project.\\n\\n" +
-      fields.map(([label, value]) => label + ": " + String(value).trim()).join("\\n");
-    const whatsappUrl = "https://wa.me/918949800427?text=" + encodeURIComponent(message);
-    const whatsappWindow = window.open(whatsappUrl, "_blank");
-    if (whatsappWindow) {
-      whatsappWindow.opener = null;
-      form.reset();
-      setFormStatus("success");
-    } else {
-      setFormStatus("error");
-    }
-  };
 
   const jumpToCategories = (filter: PortfolioGroup | "all" = "all") => {
     setActiveFilter(filter);
