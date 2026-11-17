@@ -37,7 +37,7 @@ const copy = {
     previewOnly: "Preview only",
     contactEyebrow: "LET'S MAKE SOMETHING MEANINGFUL",
     contactTitle: "Tell us about your story.",
-    contactText: "Send your project details through the enquiry form, or contact us directly by phone, WhatsApp or email.",
+    contactText: "Prepare your project enquiry in WhatsApp, or contact us directly by phone or email.",
     formName: "Your name",
     formEmail: "Email address",
     formPhone: "Phone / WhatsApp",
@@ -46,11 +46,11 @@ const copy = {
     formDate: "Event date (optional)",
     formBudget: "Budget range (optional)",
     formMessage: "Tell us a little about the project",
-    formSubmit: "Send enquiry",
+    formSubmit: "Continue in WhatsApp",
     formSending: "Sending…",
     formHeading: "PROJECT ENQUIRY",
-    formConnected: "Project enquiry",
-    formNotice: "Your enquiry was received. We will get back to you.",
+    formConnected: "WhatsApp enquiry",
+    formNotice: "WhatsApp opened with your enquiry details. Review the message and tap Send in WhatsApp.",
     formError: "We could not send your enquiry. Please try again later or contact us another way.",
     formRequiredContact: "Please enter an email address or phone number.",
     consentRequired: "Please confirm that we may use these details to respond to your enquiry.",
@@ -93,7 +93,7 @@ const copy = {
     previewOnly: "केवल प्रीव्यू",
     contactEyebrow: "आइए कुछ खास बनाएँ",
     contactTitle: "अपनी कहानी के बारे में बताएँ।",
-    contactText: "अपने प्रोजेक्ट की जानकारी enquiry form से भेजें या फोन, WhatsApp अथवा ईमेल पर सीधे संपर्क करें।",
+    contactText: "अपने प्रोजेक्ट की जानकारी WhatsApp पर तैयार करें या फोन अथवा ईमेल से सीधे संपर्क करें।",
     formName: "आपका नाम",
     formEmail: "ईमेल पता",
     formPhone: "फोन / WhatsApp",
@@ -102,11 +102,11 @@ const copy = {
     formDate: "कार्यक्रम की तारीख (वैकल्पिक)",
     formBudget: "बजट सीमा (वैकल्पिक)",
     formMessage: "अपने प्रोजेक्ट के बारे में बताएँ",
-    formSubmit: "Enquiry भेजें",
+    formSubmit: "WhatsApp पर भेजें",
     formSending: "भेज रहे हैं…",
     formHeading: "प्रोजेक्ट की पूछताछ",
-    formConnected: "प्रोजेक्ट enquiry",
-    formNotice: "आपकी enquiry मिल गई है। हम आपसे संपर्क करेंगे।",
+    formConnected: "WhatsApp enquiry",
+    formNotice: "आपकी enquiry का मैसेज WhatsApp में तैयार है। जाँचकर WhatsApp में Send दबाएँ।",
     formError: "Enquiry नहीं भेजी जा सकी। कृपया फिर कोशिश करें या दूसरे तरीके से संपर्क करें।",
     formRequiredContact: "कृपया ईमेल पता या फोन नंबर दर्ज करें।",
     consentRequired: "कृपया पुष्टि करें कि हम आपकी enquiry का जवाब देने के लिए इन विवरणों का उपयोग कर सकते हैं।",
@@ -176,34 +176,21 @@ export default function App() {
       setFormStatus("contact-required");
       return;
     }
-    setFormStatus("sending");
-    try {
-      const response = await fetch("/api/enquiries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.get("name"),
-          email: data.get("email"),
-          phone: data.get("phone"),
-          service: data.get("service"),
-          eventDate: data.get("date"),
-          budgetRange: data.get("budget"),
-          message: data.get("message"),
-          website: data.get("website"),
-          consent: data.get("consent") === "on",
-        }),
-      });
-      const contentType = response.headers.get("content-type") ?? "";
-      if (!response.ok || !contentType.toLowerCase().includes("application/json")) {
-        throw new Error("Enquiry API request failed");
-      }
-      const result = await response.json() as { ok?: boolean };
-      if (result.ok !== true) throw new Error("Enquiry API did not confirm storage");
-      form.reset();
-      setFormStatus("success");
-    } catch {
-      setFormStatus("error");
-    }
+    const fields = [
+      ["Name", data.get("name")],
+      ["Email", data.get("email")],
+      ["Phone", data.get("phone")],
+      ["Service", data.get("service")],
+      ["Event date", data.get("date")],
+      ["Budget", data.get("budget")],
+      ["Project details", data.get("message")],
+    ].filter(([, value]) => String(value ?? "").trim());
+    const message = "Hello Golden Films, I would like to enquire about a project.\\n\\n" +
+      fields.map(([label, value]) => label + ": " + String(value).trim()).join("\\n");
+    const whatsappUrl = "https://wa.me/918949800427?text=" + encodeURIComponent(message);
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    form.reset();
+    setFormStatus("success");
   };
 
   const jumpToCategories = (filter: PortfolioGroup | "all" = "all") => {
