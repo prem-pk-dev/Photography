@@ -21,6 +21,11 @@ REQUIRED_COLUMNS = {
     "audit_logs": {"id", "admin_user_id", "action", "target_type", "target_id", "created_at"},
     "site_content": {"page_slug", "draft_json", "published_json", "status", "updated_at"},
     "site_content_revisions": {"id", "page_slug", "content_json", "revision_status", "created_at"},
+    "customer_accounts": {"id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active", "created_at", "updated_at"},
+    "customer_sessions": {"id", "customer_id", "token_hash", "expires_at", "created_at"},
+    "booking_slots": {"id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_at", "created_by"},
+    "bookings": {"id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "created_at", "updated_at", "reviewed_at", "reviewed_by"},
+    "booking_rate_limits": {"rate_key", "window_started_at", "request_count"},
 }
 
 REQUIRED_INDEXES = {
@@ -34,6 +39,11 @@ REQUIRED_INDEXES = {
     "idx_projects_category_status",
     "idx_projects_public_order",
     "idx_site_content_revisions_page_created",
+    "idx_customer_sessions_expiry",
+    "idx_booking_slots_available",
+    "idx_bookings_one_active_per_slot",
+    "idx_bookings_customer_created",
+    "idx_bookings_status_created",
 }
 
 def expect_integrity_error(db, sql, message):
@@ -99,6 +109,11 @@ def main():
         ("audit_logs", "admin_user_id", "admin_users", "id"),
         ("site_content", "updated_by", "admin_users", "id"),
         ("site_content_revisions", "changed_by", "admin_users", "id"),
+        ("customer_sessions", "customer_id", "customer_accounts", "id"),
+        ("booking_slots", "created_by", "admin_users", "id"),
+        ("bookings", "customer_id", "customer_accounts", "id"),
+        ("bookings", "slot_id", "booking_slots", "id"),
+        ("bookings", "reviewed_by", "admin_users", "id"),
     }
     actual_foreign_keys = set()
     for table in set(REQUIRED_COLUMNS) | {"media"}:
@@ -153,6 +168,32 @@ def main():
         "SELECT role FROM admin_users WHERE id='least-privilege-test'"
     ).fetchone()[0]
     assert assigned_role == "editor", assigned_role
+
+    # Exercise customer account, slot, and booking relationships and active-slot uniqueness.
+    db.execute(
+        "INSERT INTO customer_accounts (id,email,password_hash,password_salt,full_name,phone) "
+        "VALUES ('customer-test','customer@example.test','hash','salt','Test Customer','9876543210')"
+    )
+    db.execute(
+        "INSERT INTO booking_slots (id,service_slug,slot_date,starts_at,ends_at) "
+        "VALUES ('slot-test','wedding-photography','2026-12-01','10:00','11:00')"
+    )
+    db.execute(
+        "INSERT INTO bookings (id,customer_id,slot_id,service_slug) "
+        "VALUES ('booking-test','customer-test','slot-test','wedding-photography')"
+    )
+    expect_integrity_error(
+        db,
+        "INSERT INTO bookings (id,customer_id,slot_id,service_slug) "
+        "VALUES ('booking-duplicate','customer-test','slot-test','wedding-photography')",
+        "A slot accepted more than one pending/confirmed booking",
+    )
+    db.execute("UPDATE bookings SET status='rejected' WHERE id='booking-test'")
+    db.execute(
+        "INSERT INTO bookings (id,customer_id,slot_id,service_slug) "
+        "VALUES ('booking-retry','customer-test','slot-test','wedding-photography')"
+    )
+    assert db.execute("SELECT COUNT(*) FROM bookings WHERE slot_id='slot-test'").fetchone()[0] == 2
 
     # Exercise representative CHECK, UNIQUE, and FK constraints, without retaining bad rows.
     expect_integrity_error(
