@@ -371,6 +371,250 @@ async function handleAdminAuth(request: Request, env: Env, url: URL): Promise<Re
 }
 
 
+
+const CUSTOMER_SESSION_SECONDS = 30 * 24 * 60 * 60;
+type CustomerSession = { id: string; email: string; full_name: string; phone: string };
+
+function customerCookie(token: string, maxAge: number): string {
+  return "__Host-gf_customer=" + token + "; Path=/; Max-Age=" + maxAge + "; Secure; HttpOnly; SameSite=Strict";
+}
+
+async function currentCustomer(request: Request, env: Env): Promise<CustomerSession | null> {
+  if (!env.DB) return null;
+  const token = cookieValue(request, "__Host-gf_customer");
+  if (!token || token.length > 256) return null;
+  try {
+    return await env.DB.prepare(
+      "SELECT c.id, c.email, c.full_name, c.phone FROM customer_sessions s " +
+      "JOIN customer_accounts c ON c.id = s.customer_id " +
+      "WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND c.is_active = 1"
+    ).bind(await sha256Hex(token)).first<CustomerSession>();
+  } catch { return null; }
+}
+
+async function handleBookingApi(request: Request, env: Env, url: URL): Promise<Response | null> {
+  const path = url.pathname;
+  const customerPaths = ["/api/customer/register", "/api/customer/login", "/api/customer/session", "/api/customer/logout"];
+  if (customerPaths.includes(path)) {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    if (path === "/api/customer/session" ? request.method !== "GET" : request.method !== "POST") {
+      return json({ error: "method_not_allowed" }, 405);
+    }
+    try {
+      if (path === "/api/customer/session") {
+        const customer = await currentCustomer(request, env);
+        return customer ? json({ authenticated: true, customer }) : json({ authenticated: false }, 401);
+      }
+      const customer = await currentCustomer(request, env);
+      if (path === "/api/customer/logout") {
+        if (!customer) return json({ ok: true });
+        const token = cookieValue(request, "__Host-gf_customer");
+        await env.DB.prepare("DELETE FROM customer_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+        const response = json({ ok: true });
+        response.headers.append("set-cookie", customerCookie("", 0));
+        return response;
+      }
+      if (await authRateLimited(request, env, path.endsWith("register") ? "customer-register" : "customer-login")) {
+        return json({ error: "temporarily_unavailable" }, 429);
+      }
+      const body = await readAdminJson(request, 8192);
+      const email = cleanText(body?.email, 254).toLowerCase();
+      const password = typeof body?.password === "string" ? body.password : "";
+      if (!isValidEmail(email) || password.length < 12 || password.length > 128) {
+        return json({ error: "validation_failed", requirements: "Use a valid email and a 12–128 character password." }, 400);
+      }
+      let account: CustomerSession | null = null;
+      if (path.endsWith("register")) {
+        const fullName = cleanText(body?.fullName, 100);
+        const phone = cleanText(body?.phone, 30);
+        const digits = phone.replace(/\\D/g, "").length;
+        if (fullName.length < 2 || !/^[+()\\d .-]{7,30}$/.test(phone) || digits < 7) {
+          return json({ error: "validation_failed", requirements: "Name and valid phone number are required." }, 400);
+        }
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO customer_accounts (id,email,password_hash,password_salt,full_name,phone) VALUES (?,?,?,?,?,?)"
+        ).bind(id, email, await deriveAdminPassword(password, salt), toBase64Url(salt), fullName, phone).run();
+        account = { id, email, full_name: fullName, phone };
+      } else {
+        const user = await env.DB.prepare(
+          "SELECT id,email,password_hash,password_salt,full_name,phone FROM customer_accounts WHERE email = ? COLLATE NOCASE AND is_active = 1"
+        ).bind(email).first<CustomerSession & { password_hash: string; password_salt: string }>();
+        const verified = user
+          ? constantTimeEqual(await deriveAdminPassword(password, fromBase64Url(user.password_salt)), user.password_hash)
+          : false;
+        if (!user || !verified) {
+          if (!user) await deriveAdminPassword(password, new Uint8Array(16));
+          return json({ error: "invalid_credentials" }, 401);
+        }
+        account = { id: user.id, email: user.email, full_name: user.full_name, phone: user.phone };
+      }
+      const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+      const expiresAt = new Date(Date.now() + CUSTOMER_SESSION_SECONDS * 1000).toISOString().replace("T", " ").replace("Z", "");
+      await env.DB.prepare("INSERT INTO customer_sessions (id,customer_id,token_hash,expires_at) VALUES (?,?,?,?)")
+        .bind(crypto.randomUUID(), account.id, await sha256Hex(token), expiresAt).run();
+      await env.DB.prepare("UPDATE customer_accounts SET last_login_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+        .bind(account.id).run();
+      const response = json({ ok: true, customer: account }, path.endsWith("register") ? 201 : 200);
+      response.headers.append("set-cookie", customerCookie(token, CUSTOMER_SESSION_SECONDS));
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("UNIQUE constraint failed: customer_accounts.email")) return json({ error: "email_already_registered" }, 409);
+      return json({ error: "customer_auth_unavailable" }, 503);
+    }
+  }
+
+  if (path === "/api/booking/slots" && request.method === "GET") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const service = cleanText(url.searchParams.get("service"), 80);
+    const from = cleanText(url.searchParams.get("from"), 10);
+    const to = cleanText(url.searchParams.get("to"), 10);
+    if (!service || !isValidDate(from) || !isValidDate(to) || !from || !to || to < from) return json({ error: "invalid_slot_query" }, 400);
+    try {
+      const result = await env.DB.prepare(
+        "SELECT s.id,s.service_slug,s.slot_date,s.starts_at,s.ends_at FROM booking_slots s " +
+        "WHERE s.status = 'available' AND s.service_slug = ? AND s.slot_date BETWEEN ? AND ? " +
+        "AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.slot_id = s.id AND b.status IN ('pending','confirmed')) " +
+        "ORDER BY s.slot_date,s.starts_at LIMIT 200"
+      ).bind(service, from, to).all();
+      return json({ slots: result.results ?? [] });
+    } catch { return json({ error: "booking_service_unavailable" }, 503); }
+  }
+
+  if (path === "/api/bookings" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const customer = await currentCustomer(request, env);
+    if (!customer) return json({ error: "customer_login_required" }, 401);
+    if (await authRateLimited(request, env, "booking-create")) return json({ error: "temporarily_unavailable" }, 429);
+    const body = await readAdminJson(request);
+    const slotId = cleanText(body?.slotId, 80);
+    const note = cleanText(body?.note, 1000);
+    if (!slotId) return json({ error: "validation_failed" }, 400);
+    try {
+      const slot = await env.DB.prepare(
+        "SELECT id,service_slug,slot_date FROM booking_slots WHERE id = ? AND status = 'available' AND slot_date >= date('now')"
+      ).bind(slotId).first<{ id: string; service_slug: string; slot_date: string }>();
+      if (!slot) return json({ error: "slot_unavailable" }, 409);
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        "INSERT INTO bookings (id,customer_id,slot_id,service_slug,customer_note,status) " +
+        "VALUES (?,?,?,?,?,'pending')"
+      ).bind(id, customer.id, slot.id, slot.service_slug, note).run();
+      return json({ ok: true, booking: { id, status: "pending", slotDate: slot.slot_date }, message: "Request submitted. Your slot is not confirmed until Golden Films approves it." }, 201);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("UNIQUE constraint failed")) return json({ error: "slot_already_requested" }, 409);
+      return json({ error: "booking_create_unavailable" }, 503);
+    }
+  }
+
+  if (path === "/api/customer/bookings" && request.method === "GET") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const customer = await currentCustomer(request, env);
+    if (!customer) return json({ error: "customer_login_required" }, 401);
+    try {
+      const result = await env.DB.prepare(
+        "SELECT b.id,b.service_slug,b.customer_note,b.admin_note,b.status,b.created_at,b.updated_at," +
+        "s.slot_date,s.starts_at,s.ends_at FROM bookings b JOIN booking_slots s ON s.id=b.slot_id " +
+        "WHERE b.customer_id=? ORDER BY b.created_at DESC LIMIT 100"
+      ).bind(customer.id).all();
+      return json({ bookings: result.results ?? [] });
+    } catch { return json({ error: "customer_bookings_unavailable" }, 503); }
+  }
+
+  if (path.startsWith("/api/admin/booking") || path === "/api/admin/slots") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    if (path === "/api/admin/bookings" && request.method === "GET") {
+      const status = cleanText(url.searchParams.get("status"), 20);
+      const allowed = ["pending","confirmed","rejected","cancelled","completed"];
+      if (status && !allowed.includes(status)) return json({ error: "invalid_status" }, 400);
+      try {
+        const result = await env.DB.prepare(
+          "SELECT b.id,b.service_slug,b.customer_note,b.admin_note,b.status,b.created_at,b.updated_at," +
+          "s.slot_date,s.starts_at,s.ends_at,c.full_name,c.email,c.phone FROM bookings b " +
+          "JOIN booking_slots s ON s.id=b.slot_id JOIN customer_accounts c ON c.id=b.customer_id " +
+          (status ? "WHERE b.status=? " : "") + "ORDER BY CASE b.status WHEN 'pending' THEN 0 ELSE 1 END,b.created_at DESC LIMIT 200"
+        ).bind(...(status ? [status] : [])).all();
+        return json({ bookings: result.results ?? [] });
+      } catch { return json({ error: "admin_bookings_unavailable" }, 503); }
+    }
+    if (path === "/api/admin/bookings/status" && request.method === "POST") {
+      const body = await readAdminJson(request);
+      const id = cleanText(body?.id, 80);
+      const status = cleanText(body?.status, 20);
+      const note = cleanText(body?.adminNote, 1000);
+      if (!id || !["confirmed","rejected","cancelled","completed"].includes(status)) return json({ error: "validation_failed" }, 400);
+      try {
+        const existing = await env.DB.prepare("SELECT status FROM bookings WHERE id=?").bind(id).first<{ status: string }>();
+        if (!existing) return json({ error: "booking_not_found" }, 404);
+        if (existing.status !== "pending" && status === "confirmed") return json({ error: "booking_not_pending" }, 409);
+        const update = await env.DB.prepare(
+          "UPDATE bookings SET status=?,admin_note=?,updated_at=datetime('now'),reviewed_at=datetime('now'),reviewed_by=? WHERE id=? " +
+          (status === "confirmed" ? "AND status='pending'" : "")
+        ).bind(status,note,admin.id,id).run();
+        if ((update.meta?.changes ?? 0) !== 1) return json({ error: "booking_state_conflict" }, 409);
+        await env.DB.prepare("INSERT INTO audit_logs (id,admin_user_id,action,target_type,target_id) VALUES (?,?,?,?,?)")
+          .bind(crypto.randomUUID(),admin.id,"booking_"+status,"booking",id).run();
+        return json({ ok: true, id, status });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("UNIQUE constraint failed")) return json({ error: "slot_already_booked" }, 409);
+        return json({ error: "booking_status_update_unavailable" }, 503);
+      }
+    }
+    if (path === "/api/admin/slots" && request.method === "GET") {
+      try {
+        const result = await env.DB.prepare(
+          "SELECT s.id,s.service_slug,s.slot_date,s.starts_at,s.ends_at,s.status,s.created_at," +
+          "(SELECT COUNT(*) FROM bookings b WHERE b.slot_id=s.id AND b.status IN ('pending','confirmed')) AS active_requests " +
+          "FROM booking_slots s ORDER BY s.slot_date DESC,s.starts_at DESC LIMIT 300"
+        ).all();
+        return json({ slots: result.results ?? [] });
+      } catch { return json({ error: "booking_slots_unavailable" }, 503); }
+    }
+    if (path === "/api/admin/slots" && request.method === "POST") {
+      const body = await readAdminJson(request);
+      const service = cleanText(body?.serviceSlug,80);
+      const date = cleanText(body?.date,10);
+      const start = cleanText(body?.startsAt,5);
+      const end = cleanText(body?.endsAt,5);
+      if (!service || !isValidDate(date) || !date || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(start) || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(end) || end <= start) {
+        return json({ error: "validation_failed" }, 400);
+      }
+      try {
+        const id = crypto.randomUUID();
+        await env.DB.prepare("INSERT INTO booking_slots (id,service_slug,slot_date,starts_at,ends_at,created_by) VALUES (?,?,?,?,?,?)")
+          .bind(id,service,date,start,end,admin.id).run();
+        await env.DB.prepare("INSERT INTO audit_logs (id,admin_user_id,action,target_type,target_id) VALUES (?,?,?,?,?)")
+          .bind(crypto.randomUUID(),admin.id,"booking_slot_created","booking_slot",id).run();
+        return json({ ok: true, id }, 201);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("UNIQUE constraint failed")) return json({ error: "slot_exists" }, 409);
+        return json({ error: "booking_slot_create_unavailable" }, 503);
+      }
+    }
+    if (path === "/api/admin/slots/status" && request.method === "POST") {
+      const body = await readAdminJson(request);
+      const id = cleanText(body?.id,80);
+      const status = cleanText(body?.status,20);
+      if (!id || !["available","blocked"].includes(status)) return json({ error: "validation_failed" }, 400);
+      try {
+        const active = await env.DB.prepare("SELECT COUNT(*) AS count FROM bookings WHERE slot_id=? AND status IN ('pending','confirmed')").bind(id).first<{count:number}>();
+        if (status === "blocked" && (active?.count ?? 0) > 0) return json({ error: "slot_has_active_booking" }, 409);
+        const update = await env.DB.prepare("UPDATE booking_slots SET status=? WHERE id=?").bind(status,id).run();
+        if ((update.meta?.changes ?? 0) !== 1) return json({ error: "slot_not_found" }, 404);
+        return json({ ok: true, id, status });
+      } catch { return json({ error: "booking_slot_update_unavailable" }, 503); }
+    }
+  }
+  return null;
+}
+
 async function supportedEnquiryStatuses(db: D1Binding): Promise<string[]> {
   const row = await db.prepare(
     "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'enquiries'"
@@ -678,6 +922,9 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       return json({ error: "media_unavailable" }, 503);
     }
   }
+
+  const bookingResponse = await handleBookingApi(request, env, url);
+  if (bookingResponse) return bookingResponse;
 
   const adminAuthResponse = await handleAdminAuth(request, env, url);
   if (adminAuthResponse) return adminAuthResponse;
