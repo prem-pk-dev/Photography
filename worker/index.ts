@@ -952,6 +952,11 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
         site_content: ["page_slug", "draft_json", "published_json", "status", "updated_at"],
         site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "created_at"],
+        customer_accounts: ["id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active"],
+        customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
+        booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
+        bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
+        booking_rate_limits: ["rate_key", "window_started_at", "request_count"],
       };
       for (const [table, expected] of Object.entries(required)) {
         const info = await env.DB.prepare("PRAGMA table_info(" + table + ")").all<{ name: string }>();
@@ -1502,6 +1507,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const adminCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM admin_users").first<{ count: number }>();
       const setup = await env.DB.prepare("SELECT completed_at FROM admin_setup WHERE id = 1").first<{ completed_at: string | null }>();
       const contentTablesReady = tables.has("site_content") && tables.has("site_content_revisions");
+      const bookingTablesReady = ["customer_accounts","customer_sessions","booking_slots","bookings","booking_rate_limits"].every(table => tables.has(table));
+
       const portfolioSchemaReady =
         ["id", "slug", "category_slug", "cover_image_url", "status", "is_featured"].every(column => projectColumns.has(column)) &&
         ["id", "slug", "title_en", "title_hi"].every(column => categoryColumns.has(column));
@@ -1524,7 +1531,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           ...(!adminRoleSchemaReady ? ["Owner/editor role migration is pending"] : []),
           ...(!enquirySchemaReady ? ["Enquiry consent/schema migration is pending"] : []),
           ...(!portfolioSchemaReady ? ["Portfolio schema is incompatible"] : []),
-          ...(!contentTablesReady ? ["CMS content tables are missing"] : []),
+          ...(!contentTablesReady ? ["CMS content tables are missing"] : []),\n          ...(!bookingTablesReady ? ["Customer booking schema migration is pending"] : []),
           ...(!env.MEDIA_BUCKET ? ["R2 media bucket binding is not configured"] : []),
         ],
       });
