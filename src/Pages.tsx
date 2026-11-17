@@ -1249,6 +1249,9 @@ function CustomerBookingPage() {
   const [bookings,setBookings] = useState<CustomerBooking[]>([]);
   const [notice,setNotice] = useState("");
   const [busy,setBusy] = useState(false);
+  const [serviceReady,setServiceReady] = useState(false);
+  const [readinessChecked,setReadinessChecked] = useState(false);
+  useEffect(()=>{fetch("/api/ready",{cache:"no-store"}).then(async r=>{if(!r.ok)return false;const d=await r.json() as {status?:string};return d.status==="ready";}).then(setServiceReady).catch(()=>setServiceReady(false)).finally(()=>setReadinessChecked(true));},[]);
   const to = new Date(Date.now()+60*86400000).toISOString().slice(0,10);
   const loadBookings = async () => {
     const r = await fetch("/api/customer/bookings",{credentials:"same-origin",cache:"no-store"});
@@ -1276,6 +1279,17 @@ function CustomerBookingPage() {
     finally{setBusy(false);}
   };
   const logout=async()=>{await fetch("/api/customer/logout",{method:"POST",credentials:"same-origin"});setCustomer(null);setBookings([]);};
+  if(!readinessChecked) return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Booking availability"><p className="section-subtitle">Checking booking service availability…</p></SiteFrame>;
+  if(!serviceReady) return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Booking temporarily unavailable">
+    <div className="service-card" style={{maxWidth:720}}>
+      <p className="section-subtitle">Online booking is temporarily unavailable while the booking service is being prepared. No account or booking request has been submitted. Please contact Golden Films directly to discuss availability.</p>
+      <div className="contact-methods" style={{marginTop:24}}>
+        <a href="https://wa.me/918949800427" target="_blank" rel="noreferrer">WhatsApp · +91 89498 00427</a>
+        <a href="tel:+918949800427">Call +91 89498 00427</a>
+        <a href="mailto:prem92006@gmail.com">prem92006@gmail.com</a>
+      </div>
+    </div>
+  </SiteFrame>;
   return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Request a photography slot">
     <p className="section-subtitle">Choose an available date and time. Your request stays Pending until Golden Films manually confirms it. No online payment is taken.</p>
     {!customer ? <section className="page-section"><div className="service-card" style={{maxWidth:620}}>
