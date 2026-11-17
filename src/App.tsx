@@ -55,7 +55,7 @@ const copy = {
     formRequiredContact: "Please enter an email address or phone number.",
     consentRequired: "Please confirm that we may use these details to respond to your enquiry.",
     consentLabel: "I agree that Golden Films may use the details above to respond to my enquiry.",
-    contactDetails: "Call or WhatsApp: +91 80498 00427 · Email: prem92006@gmail.com",
+    contactDetails: "Call or WhatsApp: +91 89498 00427 · Email: prem92006@gmail.com",
     footerLine: "Capturing moments. Crafting memories.",
     quickLinks: "Explore",
     services: "Services",
@@ -111,7 +111,7 @@ const copy = {
     formRequiredContact: "कृपया ईमेल पता या फोन नंबर दर्ज करें।",
     consentRequired: "कृपया पुष्टि करें कि हम आपकी enquiry का जवाब देने के लिए इन विवरणों का उपयोग कर सकते हैं।",
     consentLabel: "मैं सहमत हूँ कि Golden Films मेरी enquiry का जवाब देने के लिए ऊपर दिए गए विवरणों का उपयोग कर सकता है।",
-    contactDetails: "फोन या WhatsApp: +91 80498 00427 · ईमेल: prem92006@gmail.com",
+    contactDetails: "फोन या WhatsApp: +91 89498 00427 · ईमेल: prem92006@gmail.com",
     footerLine: "पलों को सँजोना। यादें बनाना।",
     quickLinks: "लिंक",
     services: "सेवाएँ",
@@ -368,7 +368,7 @@ export default function App() {
           <div className="contact-copy">
             <p className="eyebrow">{t.contactEyebrow}</p><h2>{t.contactTitle}</h2><p>{t.contactText}</p>
             <div className="contact-info-card"><span className="contact-info-icon"><MessageCircle size={21} /></span><div><strong>{language === "en" ? "Contact details" : "संपर्क विवरण"}</strong><p>{t.contactDetails}</p></div></div>
-            <div className="contact-methods"><a href="https://wa.me/918049800427" target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a><a href="tel:+918049800427"><Check size={14} /> +91 80498 00427</a><a href="mailto:prem92006@gmail.com"><Send size={14} /> prem92006@gmail.com</a></div>
+            <div className="contact-methods"><a href="https://wa.me/918949800427" target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a><a href="tel:+918949800427"><Check size={14} /> +91 89498 00427</a><a href="mailto:prem92006@gmail.com"><Send size={14} /> prem92006@gmail.com</a></div>
           </div>
           <form className="enquiry-form" onSubmit={handleEnquirySubmit}>
             <div className="form-heading"><span className="eyebrow">{t.formHeading}</span><span className="form-preview-pill">{t.formConnected}</span></div>
@@ -395,7 +395,7 @@ export default function App() {
         <div className="footer-brand"><a className="brand" href="#home"><span className="brand-mark"><Aperture size={25} /></span><span className="brand-copy"><strong>GOLDEN <em>FILMS</em></strong><small>PHOTOGRAPHY · FILMS · EDITING</small></span></a><p>{t.footerLine}</p><span className="footer-demo"><Sparkles size={13} /> {t.demo}</span></div>
         <div className="footer-column"><h3>{t.quickLinks}</h3><a href="#home">{t.nav[0]}</a><a href="#categories">{t.nav[1]}</a><a href="#featured">{t.featuredTitle}</a><a href="#about">{t.nav[3]}</a></div>
         <div className="footer-column"><h3>{t.services}</h3>{services.map((item) => <button type="button" key={item.id} onClick={() => jumpToCategories(item.id.includes("editing") ? "editing" : item.id as PortfolioGroup)}>{item.title[language]}</button>)}</div>
-        <div className="footer-column"><h3>{t.contact}</h3><a href="#contact">{t.contactSunil}</a><a href="https://wa.me/918049800427" target="_blank" rel="noreferrer">WhatsApp · +91 80498 00427</a><a href="tel:+918049800427">Call us</a><a href="mailto:prem92006@gmail.com">prem92006@gmail.com</a><span className="footer-muted">{language === "en" ? "Contact details are temporary and can be updated later." : "ये संपर्क विवरण अभी अस्थायी हैं और बाद में बदले जा सकते हैं।"}</span></div>
+        <div className="footer-column"><h3>{t.contact}</h3><a href="#contact">{t.contactSunil}</a><a href="https://wa.me/918949800427" target="_blank" rel="noreferrer">WhatsApp · +91 89498 00427</a><a href="tel:+918949800427">Call us</a><a href="mailto:prem92006@gmail.com">prem92006@gmail.com</a><span className="footer-muted">{language === "en" ? "Contact details are temporary and can be updated later." : "ये संपर्क विवरण अभी अस्थायी हैं और बाद में बदले जा सकते हैं।"}</span></div>
         <div className="footer-column"><h3>{language === "en" ? "Admin" : "एडमिन"}</h3><a href="/login.html">{language === "en" ? "Admin login" : "एडमिन लॉगिन"}</a><a href="/register.html">{language === "en" ? "Owner setup" : "ओनर सेटअप"}</a><a href="/admin.html">{language === "en" ? "Dashboard" : "डैशबोर्ड"}</a><span className="footer-muted">{language === "en" ? "Owner setup requires the private setup secret." : "ओनर सेटअप के लिए निजी सेटअप सीक्रेट ज़रूरी है।"}</span></div>
         <div className="footer-bottom"><span>© {new Date().getFullYear()} Golden Films</span><span>{t.allRights}</span><a href="#home">Back to top ↑</a></div>
       </footer>
