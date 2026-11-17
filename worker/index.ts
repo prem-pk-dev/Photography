@@ -1531,7 +1531,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           ...(!adminRoleSchemaReady ? ["Owner/editor role migration is pending"] : []),
           ...(!enquirySchemaReady ? ["Enquiry consent/schema migration is pending"] : []),
           ...(!portfolioSchemaReady ? ["Portfolio schema is incompatible"] : []),
-          ...(!contentTablesReady ? ["CMS content tables are missing"] : []),\n          ...(!bookingTablesReady ? ["Customer booking schema migration is pending"] : []),
+          ...(!contentTablesReady ? ["CMS content tables are missing"] : []),
+          ...(!bookingTablesReady ? ["Customer booking schema migration is pending"] : []),
           ...(!env.MEDIA_BUCKET ? ["R2 media bucket binding is not configured"] : []),
         ],
       });
