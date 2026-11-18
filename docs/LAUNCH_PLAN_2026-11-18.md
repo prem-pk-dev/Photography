@@ -8,7 +8,7 @@ Deliver a safe public portfolio launch by 18 November 2026. Do not represent dat
 - [x] Verify homepage and contact routes over HTTPS.
 - [x] Show temporary phone/WhatsApp and email details consistently.
 - [x] Provide direct WhatsApp, phone and email contact while enquiry storage is unavailable.
-- [x] Keep online booking fail-closed while `/api/ready` is not ready.
+- [x] Keep customer booking fail-closed while the readiness capability reports `customerBooking: false`.
 - [x] Complete Hindi contact page copy and WhatsApp enquiry labels.
 - [x] Complete Hindi About and Showreel content corrections.
 - [x] Correct service-page enquiry links so selected service is prefilled on Contact.
@@ -26,7 +26,8 @@ Deliver a safe public portfolio launch by 18 November 2026. Do not represent dat
 - [x] Repeat the rehearsal against a complete 14-application-table SQLite fixture built from Production `sqlite_master` DDL and indexes; seed representative category, owner admin, enquiry, CMS draft and revision rows; apply `0007`; verify row preservation, all five new tables, booking uniqueness and `PRAGMA foreign_key_check` with zero violations. This remains a schema-fixture rehearsal, not a restore of the actual export.
 - [ ] Rehearse migration `0007_customer_booking_foundation.sql` against the actual restored export, including full-schema compatibility, foreign-key, index, row-preservation and Worker contract checks.
 - [ ] Obtain explicit approval before any Production D1 write or migration.
-- [ ] Only after approved rollout, verify `/api/ready` returns HTTP 200 and run booking/customer end-to-end tests.
+- [x] Deploy and verify core `/api/ready` HTTP 200 with `customerBooking: false` and explicit `customer_booking` disabled capability; booking remains fail-closed.
+- [ ] After approved migration, verify `customerBooking: true` and run booking/customer end-to-end tests.
 
 ## Track C — Booking, admin and CMS (P1)
 - [ ] Test customer registration/login/session/logout.
@@ -49,10 +50,23 @@ Deliver a safe public portfolio launch by 18 November 2026. Do not represent dat
 ## Safety
 The configured `golden-films-db` is the live Production database. This session has only performed read-only catalog/PRAGMA queries and initiated/completed a D1 SQL export; no DDL or DML migration was run. Do not run migration commands against Production until the export is downloaded and restored, migration rehearsal and data-preservation checks pass, a rollback plan is ready, and the owner explicitly approves the Production change.
 
+
+## Live API readiness verification (18 November 2026, 07:44 IST)
+- Production `GET /api/health` returned HTTP 200 with `status: ok`.
+- Production `GET /api/ready` returned HTTP 200 with `status: ok`, `readiness: ready`, and `capabilities.customerBooking: false`; `disabledFeatures` explicitly contains `customer_booking`.
+- The same readiness response was confirmed on the immutable deployment URL for deployment `66bb343c-84e6-4ddc-b61e-c17554915e18`.
+- Pages build stage completed successfully. The configured build command is `npm run build`, which runs typecheck before Vite build. The repository's Node test suite was not executed by this Pages build.
+- Production D1 remains unchanged; no migration was run. The five booking/customer tables are still missing, so booking remains unavailable.
+
+## Progress accounting
+- Limited public launch checklist: 9/11 items (82%).
+- Full project checklist: 17/31 items (55%); the core API readiness endpoint is now HTTP 200, but customer booking remains explicitly disabled until its schema is safely migrated.
+
 ## Current production gate
 - `GET /api/health`: previously verified HTTP 200.
-- `GET /api/ready`: HTTP 503; live catalog inspection identifies five missing customer/booking tables as a definite blocker. Further runtime verification is still required to confirm there are no additional blockers.
+- `GET /api/ready`: HTTP 200 with `{status: ok, readiness: ready, schema: legacy-compatible, capabilities.customerBooking: false, disabledFeatures: [customer_booking]}`. This means core API dependencies are ready; it does not mean customer booking is ready.
 - The SQL export completed, but a generated export job is not by itself proof of a durable, restorable backup.
+- Latest code commit `b7d691a199e7a37020d850dd04173d37d2214d9b` deployed successfully to Pages production as deployment `66bb343c-84e6-4ddc-b61e-c17554915e18`. Build stage passed; test suite was not run by the Pages build.
 - Migration `0007` passed both a bounded admin fixture and a complete live-schema DDL fixture rehearsal; neither is an actual restore of the exported SQL, and neither authorizes Production execution.
 - Backup SQL contains authentication/session material. Store any retained export privately with restricted access; do not upload it to the public repository or include credentials/session values in handover notes.
 - Portfolio/showreel assets remain labelled as demonstration content until owner-approved material is supplied.
