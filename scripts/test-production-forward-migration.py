@@ -104,7 +104,7 @@ def main() -> None:
     db.execute("INSERT INTO admin_users(id,email,password_hash,password_salt,role) VALUES('owner','owner@example.test','hash','salt','owner')")
     db.execute("INSERT INTO admin_setup(id,completed_at) VALUES(1,'2026-11-17')")
     db.execute("INSERT INTO enquiries(id,name,service,message,consent) VALUES('enq','Test','wedding','hello',1)")
-    db.execute("INSERT INTO site_content(page_slug,draft_json) VALUES('home','{""keep"":true}')")
+    db.execute("INSERT INTO site_content(page_slug,draft_json) VALUES(?,?)", ("home", '{"keep":true}'))
     db.execute("INSERT INTO site_content_revisions(id,page_slug,content_json,revision_status) VALUES('rev','home','{}','draft')")
     db.commit()
 
