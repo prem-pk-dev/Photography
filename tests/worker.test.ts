@@ -87,7 +87,7 @@ test("readiness stays OK for core APIs while customer booking remains explicitly
         async first<T>() { return null as T | null; },
         async run() { return { success: true, meta: { changes: 0 } }; },
         async all<T>() {
-          const match = query.match(/PRAGMA table_info\\(([^)]+)\\)/);
+          const match = query.match(/PRAGMA table_info\(([^)]+)\)/);
           if (match) return { success: true, results: (schema[match[1]] ?? []).map(name => ({ name })) as T[] };
           return { success: true, results: [] as T[] };
         }
