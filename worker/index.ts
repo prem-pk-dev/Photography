@@ -952,10 +952,6 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         audit_logs: ["id", "admin_user_id", "action", "target_type", "target_id", "created_at"],
         site_content: ["page_slug", "draft_json", "published_json", "status", "updated_at"],
         site_content_revisions: ["id", "page_slug", "content_json", "revision_status", "created_at"],
-        customer_accounts: ["id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active"],
-        customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
-        booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
-        bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
       };
       for (const [table, expected] of Object.entries(required)) {
         const info = await env.DB.prepare("PRAGMA table_info(" + table + ")").all<{ name: string }>();
