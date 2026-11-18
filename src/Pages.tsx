@@ -1266,7 +1266,7 @@ function CustomerBookingPage() {
   const [busy,setBusy] = useState(false);
   const [serviceReady,setServiceReady] = useState(false);
   const [readinessChecked,setReadinessChecked] = useState(false);
-  useEffect(()=>{fetch("/api/ready",{cache:"no-store"}).then(async r=>{if(!r.ok)return false;const d=await r.json() as {status?:string};return d.status==="ready";}).then(setServiceReady).catch(()=>setServiceReady(false)).finally(()=>setReadinessChecked(true));},[]);
+  useEffect(()=>{fetch("/api/ready",{cache:"no-store"}).then(async r=>{if(!r.ok)return false;const d=await r.json() as {readiness?:string;capabilities?:{customerBooking?:boolean}};return d.readiness==="ready"&&d.capabilities?.customerBooking===true;}).then(setServiceReady).catch(()=>setServiceReady(false)).finally(()=>setReadinessChecked(true));},[]);
   const to = new Date(Date.now()+60*86400000).toISOString().slice(0,10);
   const loadBookings = async () => {
     const r = await fetch("/api/customer/bookings",{credentials:"same-origin",cache:"no-store"});
