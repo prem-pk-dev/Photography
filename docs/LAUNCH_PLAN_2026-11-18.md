@@ -22,7 +22,8 @@ Deliver a safe public portfolio launch by 18 November 2026. Do not represent dat
 - [x] Confirm the current production schema already contains the Worker-facing categories, projects, project_translations, project_media, enquiries, enquiry_rate_limits, admin_users (including role), admin_sessions, admin_setup, auth_rate_limits, audit_logs, site_content and site_content_revisions contracts.
 - [x] Identify the five missing Worker readiness tables: `customer_accounts`, `customer_sessions`, `booking_slots`, `bookings`, `booking_rate_limits`.
 - [ ] Download and retain the SQL export as a durable backup, then restore it to an isolated disposable D1/SQLite database. The export job completed, but the signed export URL retrieval/retention has not yet been verified; do not call this a verified restorable backup.
-- [ ] Rehearse migration `0007_customer_booking_foundation.sql` against the restored copy, including foreign-key, index, row-preservation and Worker contract checks.
+- [x] Run an isolated in-memory SQLite rehearsal of `0007_customer_booking_foundation.sql` against a fixture matching the inspected live `admin_users` contract; verified all five tables, five indexes, existing admin-row/role preservation, foreign keys, active-slot uniqueness, rejected-booking retry, case-insensitive email uniqueness and CHECK constraints. This is a partial rehearsal only, not a restored Production snapshot.
+- [ ] Rehearse migration `0007_customer_booking_foundation.sql` against the actual restored export, including full-schema compatibility, foreign-key, index, row-preservation and Worker contract checks.
 - [ ] Obtain explicit approval before any Production D1 write or migration.
 - [ ] Only after approved rollout, verify `/api/ready` returns HTTP 200 and run booking/customer end-to-end tests.
 
@@ -51,4 +52,5 @@ The configured `golden-films-db` is the live Production database. This session h
 - `GET /api/health`: previously verified HTTP 200.
 - `GET /api/ready`: HTTP 503; live catalog inspection identifies five missing customer/booking tables as a definite blocker. Further runtime verification is still required to confirm there are no additional blockers.
 - The SQL export completed, but a generated export job is not by itself proof of a durable, restorable backup.
+- Migration `0007` passed a bounded SQLite fixture rehearsal; do not treat that as approval to run it against Production.
 - Portfolio/showreel assets remain labelled as demonstration content until owner-approved material is supplied.
