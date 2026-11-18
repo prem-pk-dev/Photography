@@ -70,3 +70,11 @@ The configured `golden-films-db` is the live Production database. This session h
 - Migration `0007` passed both a bounded admin fixture and a complete live-schema DDL fixture rehearsal; neither is an actual restore of the exported SQL, and neither authorizes Production execution.
 - Backup SQL contains authentication/session material. Store any retained export privately with restricted access; do not upload it to the public repository or include credentials/session values in handover notes.
 - Portfolio/showreel assets remain labelled as demonstration content until owner-approved material is supplied.
+
+
+## Live smoke test (18 November 2026, 07:55 IST)
+- Production health and readiness endpoints both returned successful JSON; readiness reports core API ready while customer booking remains explicitly disabled.
+- English and Hindi category GET endpoints each returned all 14 categories without fetch errors.
+- Public booking route continues to fail closed with a clear unavailable message.
+- Latest production Pages deployment `df1aadf0-a4bc-4f24-8515-ea6c61e17c96` completed all deployment stages successfully from main commit `5fc2d6c2892b375f7444f41c4f6431d84434250b`.
+- The Pages build includes typecheck + Vite build, not the Node test suite. No Production database migration was performed.
