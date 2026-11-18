@@ -4,47 +4,51 @@
 Deliver a safe public portfolio launch by 18 November 2026. Do not represent database-dependent booking, enquiry persistence, admin or CMS functions as operational until their production checks pass.
 
 ## Track A — Public website (P0)
-- [x] Deploy public Pages site from `main`.
+- [x] Deploy public Pages site from `main`; latest known deployment for commit `ead304c` completed successfully.
 - [x] Verify homepage and contact routes over HTTPS.
 - [x] Show temporary phone/WhatsApp and email details consistently.
 - [x] Provide direct WhatsApp, phone and email contact while enquiry storage is unavailable.
-- [x] Keep booking fail-closed when `/api/ready` is not ready.
+- [x] Keep online booking fail-closed while `/api/ready` is not ready.
 - [x] Complete Hindi contact page copy and WhatsApp enquiry labels.
 - [x] Complete Hindi About and Showreel content corrections.
 - [x] Correct service-page enquiry links so selected service is prefilled on Contact.
-- [ ] Verify the latest deployment on the production hostname and recheck changed Hindi routes.
-- [ ] Run final mobile navigation, image loading, links and responsive checks.
+- [x] Recheck Hindi Portfolio, Services, Booking, Login and Admin route content on production.
+- [ ] Verify mobile navigation, image loading, tap targets and responsive layout on a real mobile device.
+- [ ] Recheck production hostname after any further application-code deployment.
 
 ## Track B — Database and application services (P0 blocker for full launch)
-- [ ] Obtain and verify a Production D1 export.
-- [ ] Restore the export to a disposable database/isolated SQLite fixture.
-- [ ] Reconcile the legacy schema against the Worker contract and test an additive migration on the restored copy.
-- [ ] Verify existing categories, translations, enquiries, admin/auth/settings data and media references are preserved.
+- [x] Generate a D1 SQL export using Cloudflare D1 export API. Export completed at bookmark `000000a8-00000000-00005127-3bafaf20dcd01b351e7f0f3354e2b546`; database metadata reports 14 application tables and 200,704 bytes.
+- [x] Read the live production SQLite catalog and PRAGMA column definitions without modifying data.
+- [x] Confirm the current production schema already contains the Worker-facing categories, projects, project_translations, project_media, enquiries, enquiry_rate_limits, admin_users (including role), admin_sessions, admin_setup, auth_rate_limits, audit_logs, site_content and site_content_revisions contracts.
+- [x] Identify the five missing Worker readiness tables: `customer_accounts`, `customer_sessions`, `booking_slots`, `bookings`, `booking_rate_limits`.
+- [ ] Download and retain the SQL export as a durable backup, then restore it to an isolated disposable D1/SQLite database. The export job completed, but the signed export URL retrieval/retention has not yet been verified; do not call this a verified restorable backup.
+- [ ] Rehearse migration `0007_customer_booking_foundation.sql` against the restored copy, including foreign-key, index, row-preservation and Worker contract checks.
 - [ ] Obtain explicit approval before any Production D1 write or migration.
-- [ ] Only after approved rollout, verify `/api/ready` returns HTTP 200.
+- [ ] Only after approved rollout, verify `/api/ready` returns HTTP 200 and run booking/customer end-to-end tests.
 
 ## Track C — Booking, admin and CMS (P1)
 - [ ] Test customer registration/login/session/logout.
 - [ ] Test slot creation, availability, booking request and admin confirmation/rejection.
-- [ ] Test admin setup/login and protected routes without exposing secrets.
+- [ ] Test admin login and protected routes without exposing secrets.
 - [ ] Test CMS draft/publish/revision and portfolio media operations.
 - [ ] Verify persistence with controlled test data.
+- Note: production catalog includes admin setup and an owner-role admin record; no credentials or password material are recorded in this plan.
 
 ## Track D — Content and handover (P1)
 - [ ] Obtain owner-approved bio and correct public identity wording.
 - [ ] Obtain genuine portfolio images and approved showreel links, or retain explicit demo labels.
-- [ ] Confirm final phone, WhatsApp and email details.
+- [x] Temporary phone, WhatsApp and email are displayed consistently; owner may replace them later.
 - [ ] Capture final smoke-test evidence and record known limitations.
 
 ## Release decision
-- **Limited public portfolio launch:** allowed only after Track A final production checks pass. Direct contact is the supported enquiry path; online booking and database-backed admin remain unavailable.
-- **Full application launch:** blocked until Track B and Track C pass. Do not bypass the readiness gate or claim successful booking/enquiry persistence without end-to-end evidence.
+- **Limited public portfolio launch:** public content and direct contact are available; online booking is explicitly unavailable. Complete the real-device checks before declaring the public launch fully verified.
+- **Full application launch:** blocked until a durable export is restored and verified, the five customer/booking tables are added through a rehearsed and approved migration, `/api/ready` returns HTTP 200, and end-to-end tests pass.
 
 ## Safety
-The configured `golden-films-db` is an existing legacy Production database. No production schema changes are authorized by this plan. Do not run DDL/DML or migration commands against Production until backup, isolated restore, migration rehearsal, data-preservation checks, rollback plan and explicit approval are complete.
+The configured `golden-films-db` is the live Production database. This session has only performed read-only catalog/PRAGMA queries and initiated/completed a D1 SQL export; no DDL or DML migration was run. Do not run migration commands against Production until the export is downloaded and restored, migration rehearsal and data-preservation checks pass, a rollback plan is ready, and the owner explicitly approves the Production change.
 
-## Current known production gate
+## Current production gate
 - `GET /api/health`: previously verified HTTP 200.
-- `GET /api/ready`: previously verified HTTP 503 due to schema incompatibility.
-- Direct contact details are temporary and can be changed later.
+- `GET /api/ready`: HTTP 503; live catalog inspection identifies five missing customer/booking tables as a definite blocker. Further runtime verification is still required to confirm there are no additional blockers.
+- The SQL export completed, but a generated export job is not by itself proof of a durable, restorable backup.
 - Portfolio/showreel assets remain labelled as demonstration content until owner-approved material is supplied.
