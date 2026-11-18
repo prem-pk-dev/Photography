@@ -475,7 +475,7 @@ async function handleBookingApi(request: Request, env: Env, url: URL): Promise<R
     try {
       const result = await env.DB.prepare(
         "SELECT s.id,s.service_slug,s.slot_date,s.starts_at,s.ends_at FROM booking_slots s " +
-        "WHERE s.status = 'available' AND s.service_slug = ? AND s.slot_date BETWEEN ? AND ? " +
+        "WHERE s.status = 'available' AND s.service_slug = ? AND s.slot_date >= date('now') AND s.slot_date BETWEEN ? AND ? " +
         "AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.slot_id = s.id AND b.status IN ('pending','confirmed')) " +
         "ORDER BY s.slot_date,s.starts_at LIMIT 200"
       ).bind(service, from, to).all();
