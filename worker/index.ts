@@ -956,14 +956,35 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
         booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
         bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
-        booking_rate_limits: ["rate_key", "window_started_at", "request_count"],
       };
       for (const [table, expected] of Object.entries(required)) {
         const info = await env.DB.prepare("PRAGMA table_info(" + table + ")").all<{ name: string }>();
         const actual = new Set((info.results ?? []).map((column) => column.name));
         if (!expected.every((column) => actual.has(column))) throw new Error("incompatible table schema");
       }
-      return json({ status: "ready", schema: "legacy-compatible" });
+
+      // Customer booking is an optional capability during the staged production rollout.
+      // Core API readiness must not be held hostage by a feature that is explicitly fail-closed.
+      const bookingRequired: Record<string, string[]> = {
+        customer_accounts: ["id", "email", "password_hash", "password_salt", "full_name", "phone", "is_active"],
+        customer_sessions: ["id", "customer_id", "token_hash", "expires_at"],
+        booking_slots: ["id", "service_slug", "slot_date", "starts_at", "ends_at", "status", "created_by"],
+        bookings: ["id", "customer_id", "slot_id", "service_slug", "customer_note", "admin_note", "status", "reviewed_by"],
+        booking_rate_limits: ["rate_key", "window_started_at", "request_count"],
+      };
+      let customerBookingReady = true;
+      for (const [table, expected] of Object.entries(bookingRequired)) {
+        const info = await env.DB.prepare("PRAGMA table_info(" + table + ")").all<{ name: string }>();
+        const actual = new Set((info.results ?? []).map((column) => column.name));
+        if (!expected.every((column) => actual.has(column))) customerBookingReady = false;
+      }
+      return json({
+        status: "ok",
+        readiness: "ready",
+        schema: "legacy-compatible",
+        capabilities: { customerBooking: customerBookingReady },
+        disabledFeatures: customerBookingReady ? [] : ["customer_booking"],
+      });
     } catch {
       return json({ error: "database_schema_incompatible" }, 503);
     }
