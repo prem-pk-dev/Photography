@@ -29,5 +29,7 @@ jobs:
         run: python3 scripts/test-forward-migration.py
       - name: Run fresh-schema Worker contract fixture test
         run: python3 scripts/test-fresh-schema.py
+      - name: Run production booking forward migration test
+        run: python3 scripts/test-production-booking-forward.py
       - name: Build frontend
         run: npm run build
