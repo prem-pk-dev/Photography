@@ -1390,14 +1390,22 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         },
       );
       if (!uploadResponse.ok) {
-        const githubError = await uploadResponse.json().catch(() => null) as { message?: unknown; errors?: unknown } | null;
+        const githubBody = await uploadResponse.text().catch(() => "");
+        let githubError: { message?: unknown } | null = null;
+        try {
+          githubError = JSON.parse(githubBody) as { message?: unknown };
+        } catch {
+          githubError = null;
+        }
+        const fallbackMessage = githubBody.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
         const githubMessage = typeof githubError?.message === "string"
           ? githubError.message.slice(0, 240)
-          : "GitHub rejected the repository upload.";
+          : (fallbackMessage || "GitHub rejected the repository upload.").slice(0, 240);
         return json({
           error: "media_repository_upload_failed",
           githubStatus: uploadResponse.status,
           githubMessage,
+          githubRequestId: uploadResponse.headers.get("x-github-request-id") || undefined,
         }, 503);
       }
       const uploaded = await uploadResponse.json() as {
