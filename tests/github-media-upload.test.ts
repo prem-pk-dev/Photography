@@ -170,7 +170,7 @@ async function saveProject(db: ReturnType<typeof projectSaveDb>) {
   return response;
 }
 
-test("project save supports the live legacy D1 translation schema without language column", async () => {
+test("project save supports legacy D1 required project columns and language translations", async () => {
   const db = projectSaveDb(true, true);
   const response = await saveProject(db);
   assert.equal(response.status, 200);
@@ -187,7 +187,7 @@ test("project save supports the live legacy D1 translation schema without langua
   assert.match(db.projectInsertQueries[0], /cover_object_key/);
 });
 
-test("project save retains compatibility with fresh D1 schema containing language column", async () => {
+test("project save supports the modern D1 schema without legacy project columns", async () => {
   const db = projectSaveDb(false, false);
   const response = await saveProject(db);
   assert.equal(response.status, 200);
