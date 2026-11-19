@@ -105,3 +105,79 @@ test("GitHub media upload writes the validated file and stores its immutable raw
     globalThis.fetch = originalFetch;
   }
 });
+
+
+function projectSaveDb(hasLanguageColumn: boolean) {
+  const translationQueries: string[] = [];
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  return {
+    translationQueries,
+    prepare(query: string) {
+      return {
+        bind(..._values: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) return admin as T;
+          if (query.includes("SELECT id, status FROM projects")) return null as T | null;
+          if (query.includes("SELECT slug FROM categories")) return { slug: "wedding-photography" } as T;
+          if (query.includes("INSERT INTO projects")) return { id: projectId } as T;
+          return null as T | null;
+        },
+        async all<T>() {
+          if (query.includes("PRAGMA table_info(project_translations)")) {
+            const columns = ["project_id", "locale", "title", "description"];
+            if (hasLanguageColumn) columns.push("language");
+            return { success: true, results: columns.map((name) => ({ name })) as T[] };
+          }
+          return { success: true, results: [] as T[] };
+        },
+        async run() {
+          if (query.includes("INSERT INTO project_translations")) translationQueries.push(query);
+          return { success: true, meta: { changes: 1 } };
+        },
+      };
+    },
+  };
+}
+
+async function saveProject(db: ReturnType<typeof projectSaveDb>) {
+  const response = await worker.fetch(new Request("https://example.test/api/admin/projects/save", {
+    method: "POST",
+    headers: {
+      cookie: "__Host-gf_admin=test-session",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      slug: "jaipur-wedding-2026",
+      categorySlug: "wedding-photography",
+      titleEn: "Jaipur Wedding",
+      titleHi: "जयपुर वेडिंग",
+      descriptionEn: "",
+      descriptionHi: "",
+      coverImageUrl: "/api/media/projects/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg",
+      status: "draft",
+    }),
+  }), { DB: db });
+  return response;
+}
+
+test("project save supports the live legacy D1 translation schema without language column", async () => {
+  const db = projectSaveDb(false);
+  const response = await saveProject(db);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    id: "11111111-1111-4111-8111-111111111111",
+    slug: "jaipur-wedding-2026",
+    status: "draft",
+  });
+  assert.equal(db.translationQueries.length, 2);
+  assert.ok(db.translationQueries.every((query) => !query.includes("language")));
+});
+
+test("project save retains compatibility with fresh D1 schema containing language column", async () => {
+  const db = projectSaveDb(true);
+  const response = await saveProject(db);
+  assert.equal(response.status, 200);
+  assert.equal(db.translationQueries.length, 2);
+  assert.ok(db.translationQueries.every((query) => query.includes("language")));
+});
