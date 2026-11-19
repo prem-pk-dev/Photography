@@ -181,8 +181,7 @@ test("project save supports legacy D1 required project columns and language tran
     status: "draft",
   });
   assert.equal(db.translationQueries.length, 2);
-  assert.ok(db.translationQueries.every((query) => !query.includes("language")));
-  assert.doesNotMatch(db.projectInsertQueries[0], /category_id|cover_object_key/);
+  assert.ok(db.translationQueries.every((query) => query.includes("language")));
   assert.match(db.projectInsertQueries[0], /category_id/);
   assert.match(db.projectInsertQueries[0], /cover_object_key/);
 });
@@ -192,5 +191,6 @@ test("project save supports the modern D1 schema without legacy project columns"
   const response = await saveProject(db);
   assert.equal(response.status, 200);
   assert.equal(db.translationQueries.length, 2);
-  assert.ok(db.translationQueries.every((query) => query.includes("language")));
+  assert.ok(db.translationQueries.every((query) => !query.includes("language")));
+  assert.doesNotMatch(db.projectInsertQueries[0], /category_id|cover_object_key/);
 });
