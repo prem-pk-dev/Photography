@@ -1278,14 +1278,23 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
         .first<{ id: string }>();
       if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'en', 'en', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleEn, descriptionEn).run();
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'hi', 'hi', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleHi, descriptionHi).run();
+      // Production's legacy D1 schema has only (project_id, locale, title, description),
+      // while fresh installs retain the legacy NOT NULL language column as well.
+      // Detect the deployed shape instead of assuming one schema across environments.
+      const translationInfo = await env.DB.prepare("PRAGMA table_info(project_translations)").all<{ name: string }>();
+      const hasLanguageColumn = (translationInfo.results ?? []).some((column) => column.name === "language");
+      const translationSql = hasLanguageColumn
+        ? "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, ?, ?, ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
+        : "INSERT INTO project_translations (project_id, locale, title, description) VALUES (?, ?, ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description";
+      if (hasLanguageColumn) {
+        await env.DB.prepare(translationSql).bind(project.id, "en", "en", titleEn, descriptionEn).run();
+        await env.DB.prepare(translationSql).bind(project.id, "hi", "hi", titleHi, descriptionHi).run();
+      } else {
+        await env.DB.prepare(translationSql).bind(project.id, "en", titleEn, descriptionEn).run();
+        await env.DB.prepare(translationSql).bind(project.id, "hi", titleHi, descriptionHi).run();
+      }
       await env.DB.prepare(
         "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'project', ?)"
       ).bind(crypto.randomUUID(), admin.id, status === "published" ? "project_published" : "project_saved_draft", project.id).run();
