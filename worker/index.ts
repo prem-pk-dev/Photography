@@ -1378,6 +1378,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           method: "PUT",
           headers: {
             "accept": "application/vnd.github+json",
+            "user-agent": "Photography-Media-Uploader/1.0",
             "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
             "content-type": "application/json",
             "x-github-api-version": "2022-11-28",
@@ -1439,6 +1440,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
             method: "DELETE",
             headers: {
               "accept": "application/vnd.github+json",
+              "user-agent": "Photography-Media-Uploader/1.0",
               "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
               "content-type": "application/json",
               "x-github-api-version": "2022-11-28",
