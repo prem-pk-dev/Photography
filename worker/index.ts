@@ -1287,13 +1287,20 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       addProjectValue("location", location || null);
       addProjectValue("project_date", projectDate || null);
       addProjectValue("demo_label", demoLabel);
-      addProjectValue("updated_at", "datetime('now')");
       const insertColumns = projectValues.map(([column]) => column);
       const insertValues = projectValues.map(([, value]) => value);
+      const insertExpressions = insertValues.map(() => "?");
+      if (projectColumns.has("updated_at")) {
+        insertColumns.push("updated_at");
+        insertExpressions.push("datetime('now')");
+      }
       const updateColumns = insertColumns.filter((column) => !["id", "slug"].includes(column));
+      const updateAssignments = updateColumns.map((column) =>
+        column === "updated_at" ? "updated_at = datetime('now')" : `${column} = excluded.${column}`
+      );
       const insertSql =
-        `INSERT INTO projects (${insertColumns.join(", ")}) VALUES (${insertValues.map(() => "?").join(", ")}) ` +
-        `ON CONFLICT(slug) DO UPDATE SET ${updateColumns.map((column) => `${column} = excluded.${column}`).join(", ")} RETURNING id`;
+        `INSERT INTO projects (${insertColumns.join(", ")}) VALUES (${insertExpressions.join(", ")}) ` +
+        `ON CONFLICT(slug) DO UPDATE SET ${updateAssignments.join(", ")} RETURNING id`;
       const project = await env.DB.prepare(insertSql).bind(...insertValues)
         .first<{ id: string }>();
       if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
