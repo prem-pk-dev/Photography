@@ -39,6 +39,7 @@ interface Env {
   DB?: D1Binding;
   ASSETS?: StaticAssetsBinding;
   MEDIA_BUCKET?: R2BucketBinding;
+  MEDIA_GITHUB_TOKEN?: string;
   ADMIN_SETUP_SECRET?: string;
 }
 
@@ -865,6 +866,14 @@ async function handleContentApi(request: Request, env: Env, url: URL): Promise<R
   return null;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(binary);
+}
+
 async function handleApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const origin = request.headers.get("origin");
@@ -1291,7 +1300,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     if (!env.DB) return json({ error: "database_not_configured" }, 503);
     const admin = await currentAdmin(request, env);
     if (!admin) return json({ error: "unauthorized" }, 401);
-    if (!env.MEDIA_BUCKET) return json({ error: "media_storage_not_configured" }, 503);
+    if (!env.MEDIA_GITHUB_TOKEN) return json({ error: "media_storage_not_configured" }, 503);
     const declaredLength = Number(request.headers.get("content-length") ?? "0");
     if (declaredLength > 20 * 1024 * 1024 + 64 * 1024) return json({ error: "file_too_large" }, 413);
     let form: FormData;
@@ -1310,38 +1319,85 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
       "video/mp4": "mp4", "video/webm": "webm",
     };
-    const extension = mimeExtensions[file.type.toLowerCase()];
+    const mimeType = file.type.toLowerCase();
+    const extension = mimeExtensions[mimeType];
     if (!extension) return json({ error: "unsupported_media_type", allowed: Object.keys(mimeExtensions) }, 415);
-    const mediaType = file.type.startsWith("video/") ? "video" : "image";
+    const mediaType = mimeType.startsWith("video/") ? "video" : "image";
     if (!await hasValidMediaSignature(file)) return json({ error: "file_signature_mismatch" }, 415);
     if ((isPublic || isCover) && admin.role !== "owner") return json({ error: "forbidden" }, 403);
+    if (isCover && mediaType !== "image") return json({ error: "cover_must_be_image" }, 400);
+    if (isCover && !isPublic) return json({ error: "cover_must_be_public" }, 400);
+
     try {
-      const project = await env.DB.prepare("SELECT id, status FROM projects WHERE id = ?").bind(projectId).first<{ id: string; status: string }>();
+      const project = await env.DB.prepare("SELECT id, status FROM projects WHERE id = ?")
+        .bind(projectId).first<{ id: string; status: string }>();
       if (!project) return json({ error: "project_not_found" }, 404);
-      if (isCover && mediaType !== "image") return json({ error: "cover_must_be_image" }, 400);
-      if (isCover && !isPublic) return json({ error: "cover_must_be_public" }, 400);
+
       const id = crypto.randomUUID();
       const key = "projects/" + projectId + "/" + id + "." + extension;
-      await env.MEDIA_BUCKET.put(key, file.stream(), {
-        httpMetadata: { contentType: file.type.toLowerCase() },
-        customMetadata: { projectId, mediaId: id, uploadedBy: admin.id },
-      });
-      const previewUrl = "/api/media/" + key;
-      try {
-        await env.DB.prepare(
+      const encodedPath = key.split("/").map(encodeURIComponent).join("/");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const uploadResponse = await fetch(
+        "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
+        {
+          method: "PUT",
+          headers: {
+            "accept": "application/vnd.github+json",
+            "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+            "content-type": "application/json",
+            "x-github-api-version": "2022-11-28",
+          },
+          body: JSON.stringify({
+            message: "Upload portfolio media " + id,
+            content: bytesToBase64(bytes),
+            branch: "main",
+          }),
+        },
+      );
+      if (!uploadResponse.ok) return json({ error: "media_repository_upload_failed" }, 503);
+      const uploaded = await uploadResponse.json() as {
+        content?: { sha?: string };
+        commit?: { sha?: string };
+      };
+      const blobSha = uploaded.content?.sha;
+      const commitSha = uploaded.commit?.sha;
+      if (!blobSha || !commitSha) return json({ error: "media_repository_response_invalid" }, 503);
+
+      const previewUrl = "https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/" +
+        commitSha + "/" + encodedPath;
+      const statements = [
+        env.DB.prepare(
           "INSERT INTO project_media (id, project_id, media_type, preview_url, original_key, alt_en, alt_hi, sort_order, is_public) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, projectId, mediaType, previewUrl, key, altEn, altHi, sortOrder, isPublic ? 1 : 0).run();
-        if (isCover) {
-          await env.DB.prepare("UPDATE projects SET cover_image_url = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(previewUrl, projectId).run();
-        }
-        await env.DB.prepare(
+        ).bind(id, projectId, mediaType, previewUrl, key, altEn, altHi, sortOrder, isPublic ? 1 : 0),
+        ...(isCover ? [env.DB.prepare(
+          "UPDATE projects SET cover_image_url = ?, updated_at = datetime('now') WHERE id = ?"
+        ).bind(previewUrl, projectId)] : []),
+        env.DB.prepare(
           "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'media', ?)"
-        ).bind(crypto.randomUUID(), admin.id, isPublic ? "media_uploaded_public" : "media_uploaded_draft", id).run();
-      } catch (error) {
-        await env.MEDIA_BUCKET.delete(key).catch(() => undefined);
-        throw error;
+        ).bind(crypto.randomUUID(), admin.id, isPublic ? "media_uploaded_public" : "media_uploaded_draft", id),
+      ];
+      try {
+        await env.DB.batch(statements);
+      } catch {
+        await fetch(
+          "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
+          {
+            method: "DELETE",
+            headers: {
+              "accept": "application/vnd.github+json",
+              "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+              "content-type": "application/json",
+              "x-github-api-version": "2022-11-28",
+            },
+            body: JSON.stringify({
+              message: "Rollback failed media metadata " + id,
+              sha: blobSha,
+              branch: "main",
+            }),
+          },
+        ).catch(() => undefined);
+        throw new Error("media_metadata_save_failed");
       }
       return json({ ok: true, id, previewUrl, mediaType, isPublic, isCover }, 201);
     } catch {
@@ -1542,7 +1598,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         enquirySchemaReady,
         portfolioSchemaReady,
         contentTablesReady,
-        mediaStorageConfigured: Boolean(env.MEDIA_BUCKET),
+        mediaStorageConfigured: Boolean(env.MEDIA_GITHUB_TOKEN),
         blockers: [
           ...(!env.ADMIN_SETUP_SECRET ? ["ADMIN_SETUP_SECRET is not configured"] : []),
           ...(!adminRoleSchemaReady ? ["Owner/editor role migration is pending"] : []),
@@ -1550,7 +1606,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           ...(!portfolioSchemaReady ? ["Portfolio schema is incompatible"] : []),
           ...(!contentTablesReady ? ["CMS content tables are missing"] : []),
           ...(!bookingTablesReady ? ["Customer booking schema migration is pending"] : []),
-          ...(!env.MEDIA_BUCKET ? ["R2 media bucket binding is not configured"] : []),
+          ...(!env.MEDIA_GITHUB_TOKEN ? ["MEDIA_GITHUB_TOKEN is not configured"] : []),
         ],
       });
     } catch {
