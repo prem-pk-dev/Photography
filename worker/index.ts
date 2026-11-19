@@ -1269,13 +1269,32 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const category = await env.DB.prepare("SELECT slug FROM categories WHERE slug = ?").bind(categorySlug).first<{ slug: string }>();
       if (!category) return json({ error: "invalid_category" }, 400);
       const projectId = crypto.randomUUID();
-      const project = await env.DB.prepare(
-        "INSERT INTO projects (id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label, updated_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
-        "ON CONFLICT(slug) DO UPDATE SET category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, " +
-        "status = excluded.status, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
-        "demo_label = excluded.demo_label, updated_at = datetime('now') RETURNING id"
-      ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
+      // The Preview D1 still has required legacy columns category_id and cover_object_key;
+      // the newer D1 schema has category_slug and cover_image_url instead. Build the
+      // INSERT from the actual table shape so both supported schemas remain writable.
+      const projectInfo = await env.DB.prepare("PRAGMA table_info(projects)").all<{ name: string }>();
+      const projectColumns = new Set((projectInfo.results ?? []).map((column) => column.name));
+      const projectValues: Array<[string, unknown]> = [["id", projectId], ["slug", slug]];
+      const addProjectValue = (column: string, value: unknown) => {
+        if (projectColumns.has(column)) projectValues.push([column, value]);
+      };
+      addProjectValue("category_id", categorySlug);
+      addProjectValue("category_slug", categorySlug);
+      addProjectValue("cover_object_key", `github-cover/${slug}`);
+      addProjectValue("cover_image_url", coverImageUrl);
+      addProjectValue("status", status);
+      addProjectValue("is_featured", body?.isFeatured === true ? 1 : 0);
+      addProjectValue("location", location || null);
+      addProjectValue("project_date", projectDate || null);
+      addProjectValue("demo_label", demoLabel);
+      addProjectValue("updated_at", "datetime('now')");
+      const insertColumns = projectValues.map(([column]) => column);
+      const insertValues = projectValues.map(([, value]) => value);
+      const updateColumns = insertColumns.filter((column) => !["id", "slug"].includes(column));
+      const insertSql =
+        `INSERT INTO projects (${insertColumns.join(", ")}) VALUES (${insertValues.map(() => "?").join(", ")}) ` +
+        `ON CONFLICT(slug) DO UPDATE SET ${updateColumns.map((column) => `${column} = excluded.${column}`).join(", ")} RETURNING id`;
+      const project = await env.DB.prepare(insertSql).bind(...insertValues)
         .first<{ id: string }>();
       if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
       // Production's legacy D1 schema has only (project_id, locale, title, description),
