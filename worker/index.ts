@@ -1372,24 +1372,32 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const key = "projects/" + projectId + "/" + id + "." + extension;
       const encodedPath = key.split("/").map(encodeURIComponent).join("/");
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const uploadResponse = await fetch(
-        "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
-        {
-          method: "PUT",
-          headers: {
-            "accept": "application/vnd.github+json",
-            "user-agent": "Photography-Media-Uploader/1.0",
-            "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
-            "content-type": "application/json",
-            "x-github-api-version": "2022-11-28",
-          },
-          body: JSON.stringify({
-            message: "Upload portfolio media " + id,
-            content: bytesToBase64(bytes),
-            branch: "main",
-          }),
+      const githubUploadUrl =
+        "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath;
+      const githubUploadInit: RequestInit = {
+        method: "PUT",
+        headers: {
+          "accept": "application/vnd.github+json",
+          "user-agent": "Photography-Media-Uploader/1.0",
+          "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+          "content-type": "application/json",
+          "x-github-api-version": "2022-11-28",
         },
-      );
+        body: JSON.stringify({
+          message: "Upload portfolio media " + id,
+          content: bytesToBase64(bytes),
+          branch: "main",
+        }),
+      };
+      // GitHub can return 409 when another upload advances main between
+      // preparing the Contents API write and updating the branch ref. The
+      // destination path is unique, so retry the identical PUT a few times.
+      let uploadResponse: Response;
+      for (let attempt = 0; ; attempt += 1) {
+        uploadResponse = await fetch(githubUploadUrl, githubUploadInit);
+        if (uploadResponse.status !== 409 || attempt >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
       if (!uploadResponse.ok) {
         const githubBody = await uploadResponse.text().catch(() => "");
         let githubError: { message?: unknown } | null = null;
