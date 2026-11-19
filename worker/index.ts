@@ -1389,7 +1389,17 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           }),
         },
       );
-      if (!uploadResponse.ok) return json({ error: "media_repository_upload_failed" }, 503);
+      if (!uploadResponse.ok) {
+        const githubError = await uploadResponse.json().catch(() => null) as { message?: unknown; errors?: unknown } | null;
+        const githubMessage = typeof githubError?.message === "string"
+          ? githubError.message.slice(0, 240)
+          : "GitHub rejected the repository upload.";
+        return json({
+          error: "media_repository_upload_failed",
+          githubStatus: uploadResponse.status,
+          githubMessage,
+        }, 503);
+      }
       const uploaded = await uploadResponse.json() as {
         content?: { sha?: string };
         commit?: { sha?: string };
