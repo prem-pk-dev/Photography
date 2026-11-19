@@ -3,7 +3,7 @@
 :root{color-scheme:dark;--gold:#d8b36a;--muted:#a8a7a1}*{box-sizing:border-box}body{margin:0;background:#090b0d;color:#f7f3eb;font:15px/1.5 system-ui,sans-serif}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px clamp(18px,5vw,60px);border-bottom:1px solid #34332e;background:#111312}.brand{color:var(--gold);letter-spacing:.18em;font-weight:700;font-size:12px}.top a{color:var(--gold)}button{border:1px solid #55472d;background:#1c1a15;color:var(--gold);padding:10px 14px;border-radius:8px;cursor:pointer}.wrap{max-width:1100px;margin:auto;padding:clamp(22px,5vw,56px) 20px}h1{font:500 clamp(32px,5vw,48px)/1.1 Georgia,serif;margin:0 0 10px}.muted{color:var(--muted)}.banner{border:1px solid #50452e;background:#17150f;padding:16px;border-radius:12px;margin:24px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:22px}.tile{border:1px solid #34332e;border-radius:14px;padding:22px;background:#111312}.tile h2{font:500 23px Georgia,serif;margin:0 0 10px}.tile p{color:var(--muted);min-height:48px}.tile a{color:var(--gold)}.status{font-size:14px;color:var(--muted)}.list{margin-top:24px;border:1px solid #34332e;border-radius:12px;padding:18px;overflow-wrap:anywhere}pre{white-space:pre-wrap;word-break:break-word;color:#d7d4cb;font-size:12px}
 </style></head><body><header class="top"><div class="brand">GOLDEN FILMS · ADMIN</div><div><a href="/" style="margin-right:16px">View website ↗</a><button id="logout" hidden>Sign out</button></div></header><main class="wrap"><p class="muted">SECURE WORKSPACE</p><h1>Admin dashboard</h1><p class="muted" id="welcome">Checking your session…</p><div id="banner" class="banner" role="status" aria-live="polite">Verifying authentication with the server.</div><section id="workspace" hidden><div class="grid"><article class="tile"><h2>Website content</h2><p>Review available pages and content status from the authenticated API.</p><a href="#content" id="load-content">Load content pages →</a></article><article class="tile"><h2>Enquiries</h2><p>Enquiry management requires the admin enquiry API and compatible database schema.</p><span class="muted">Backend availability will be checked on request.</span></article><article class="tile"><h2>Preview drafts</h2><p>Open the homepage draft preview after signing in.</p><a href="/?preview=1">Open draft preview →</a></article></div><section id="projects" class="list">
 <h2>Portfolio Projects</h2>
-<p class="muted">Create portfolio entries using existing MEDIA-ASSETS public URLs. Files are not uploaded here; R2 is not used. New entries are saved as drafts unless an owner explicitly publishes them.</p>
+<p class="muted">Create portfolio entries and upload media directly to the PHOTOGRAPHY-MEDIA repository. New entries are saved as drafts unless an owner explicitly publishes them.</p>
 <div class="grid">
 <label>Project slug<input id="project-slug" placeholder="wedding-story-jaipur" maxlength="80" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
 <label>Category<select id="project-category" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></select></label>
@@ -20,16 +20,16 @@
 <p id="project-status" class="status" role="status" aria-live="polite"></p>
 <h3>Existing projects</h3><div id="project-list" class="muted">Sign in to load projects.</div>
 <div style="border-top:1px solid #34332e;margin-top:22px;padding-top:18px">
-<h3>Add media to a saved project</h3><p class="muted">Add an image/video URL from MEDIA-ASSETS. Keep media private until reviewed; publishing media requires the owner role.</p>
+<h3>Upload media to a saved project</h3><p class="muted">Images and videos upload to the public PHOTOGRAPHY-MEDIA GitHub repository. Files stay private in the portfolio until an owner publishes them. Maximum file size: 20 MiB.</p>
 <div class="grid">
 <label>Project<select id="media-project" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></select></label>
-<label>Media type<select id="media-type" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"><option value="image">Image</option><option value="video">Video</option></select></label>
-<label style="grid-column:1/-1">Media URL<input id="media-url" type="url" placeholder="https://media-assets-4sb.pages.dev/..." style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
+<label style="grid-column:1/-1">Image or video file<input id="media-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
 <label>Alt text (English)<input id="media-alt-en" maxlength="250" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
 <label>Alt text (Hindi)<input id="media-alt-hi" maxlength="250" style="display:block;width:100%;margin-top:7px;padding:11px;background:#0b0d0c;color:#f7f3eb;border:1px solid #49463e;border-radius:8px"></label>
 </div>
-<label style="display:block;margin-top:12px"><input id="media-public" type="checkbox"> Mark media public (owner only)</label>
-<button id="add-media" type="button" style="margin-top:14px">Add media URL</button><p id="media-status" class="status" role="status" aria-live="polite"></p>
+<label style="display:block;margin-top:12px"><input id="media-public" type="checkbox"> Publish media now (owner only)</label>
+<label style="display:block;margin-top:8px"><input id="media-cover" type="checkbox"> Set as project cover (requires public image)</label>
+<button id="upload-media" type="button" style="margin-top:14px">Upload media</button><p id="media-status" class="status" role="status" aria-live="polite"></p>
 </div>
 </section>
 <section id="content" class="list">
@@ -107,12 +107,15 @@ document.querySelector('#save-project').addEventListener('click',async()=>{
  try{const data=await requestJson('/api/admin/projects/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});status.textContent='Project saved as draft: '+data.slug+'. It is not public.';await loadProjectManager()}
  catch(err){status.textContent='Project save failed: '+err.message}
 });
-document.querySelector('#add-media').addEventListener('click',async()=>{
- const status=document.querySelector('#media-status');const projectId=mediaProject.value;const previewUrl=document.querySelector('#media-url').value.trim();
+document.querySelector('#upload-media').addEventListener('click',async()=>{
+ const status=document.querySelector('#media-status');const projectId=mediaProject.value;const file=document.querySelector('#media-file').files[0];
  if(!projectId){status.textContent='Save a project first, then select it here.';return}
- status.textContent='Adding media URL…';
- try{const data=await requestJson('/api/admin/projects/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId,mediaType:document.querySelector('#media-type').value,previewUrl,altEn:document.querySelector('#media-alt-en').value.trim(),altHi:document.querySelector('#media-alt-hi').value.trim(),sortOrder:0,isPublic:document.querySelector('#media-public').checked})});status.textContent='Media URL added. Public: '+data.isPublic+'.';document.querySelector('#media-url').value=''}
- catch(err){status.textContent='Media add failed: '+err.message}
+ if(!file){status.textContent='Choose an image or video file first.';return}
+ if(file.size>20*1024*1024){status.textContent='File is larger than 20 MiB.';return}
+ const form=new FormData();form.append('projectId',projectId);form.append('file',file);form.append('altEn',document.querySelector('#media-alt-en').value.trim());form.append('altHi',document.querySelector('#media-alt-hi').value.trim());form.append('sortOrder','0');form.append('isPublic',String(document.querySelector('#media-public').checked));form.append('isCover',String(document.querySelector('#media-cover').checked));
+ status.textContent='Uploading media to GitHub…';
+ try{const data=await requestJson('/api/admin/projects/media/upload',{method:'POST',body:form});status.textContent='Upload complete. '+(data.isPublic?'Media is public.':'Media saved as private draft.');document.querySelector('#media-file').value='';await loadProjectManager()}
+ catch(err){status.textContent='Media upload failed: '+err.message}
 });
 
 renderFields();checkSession();
