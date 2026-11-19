@@ -107,6 +107,37 @@ test("GitHub media upload writes the validated file and stores its immutable raw
 });
 
 
+test("GitHub media upload retries a transient branch ref conflict", async () => {
+  const originalFetch = globalThis.fetch;
+  const db = makeDb();
+  let attempts = 0;
+  globalThis.fetch = async (_input, init) => {
+    attempts += 1;
+    assert.equal(new Headers(init?.headers).get("user-agent"), "Photography-Media-Uploader/1.0");
+    if (attempts === 1) {
+      return new Response(JSON.stringify({
+        message: "Reference update failed: is at newer-sha but expected older-sha",
+      }), { status: 409, headers: { "content-type": "application/json" } });
+    }
+    return new Response(JSON.stringify({
+      content: { sha: "blob-sha" },
+      commit: { sha: "commit-sha" },
+    }), { status: 201, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(
+      uploadRequest([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
+      { DB: db, MEDIA_GITHUB_TOKEN: "test-token" },
+    );
+    assert.equal(response.status, 201);
+    assert.equal(attempts, 2);
+    assert.deepEqual(db.batches, [2]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
 function projectSaveDb(hasLanguageColumn: boolean, hasLegacyProjectColumns: boolean) {
   const translationQueries: string[] = [];
   const projectInsertQueries: string[] = [];
