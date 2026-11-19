@@ -107,11 +107,13 @@ test("GitHub media upload writes the validated file and stores its immutable raw
 });
 
 
-function projectSaveDb(hasLanguageColumn: boolean) {
+function projectSaveDb(hasLanguageColumn: boolean, hasLegacyProjectColumns: boolean) {
   const translationQueries: string[] = [];
+  const projectInsertQueries: string[] = [];
   const projectId = "11111111-1111-4111-8111-111111111111";
   return {
     translationQueries,
+    projectInsertQueries,
     prepare(query: string) {
       return {
         bind(..._values: unknown[]) { return this; },
@@ -119,13 +121,21 @@ function projectSaveDb(hasLanguageColumn: boolean) {
           if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) return admin as T;
           if (query.includes("SELECT id, status FROM projects")) return null as T | null;
           if (query.includes("SELECT slug FROM categories")) return { slug: "wedding-photography" } as T;
-          if (query.includes("INSERT INTO projects")) return { id: projectId } as T;
+          if (query.includes("INSERT INTO projects")) {
+            projectInsertQueries.push(query);
+            return { id: projectId } as T;
+          }
           return null as T | null;
         },
         async all<T>() {
           if (query.includes("PRAGMA table_info(project_translations)")) {
             const columns = ["project_id", "locale", "title", "description"];
             if (hasLanguageColumn) columns.push("language");
+            return { success: true, results: columns.map((name) => ({ name })) as T[] };
+          }
+          if (query.includes("PRAGMA table_info(projects)")) {
+            const columns = ["id", "slug", "category_slug", "cover_image_url", "status", "is_featured", "location", "project_date", "demo_label", "updated_at"];
+            if (hasLegacyProjectColumns) columns.push("category_id", "cover_object_key");
             return { success: true, results: columns.map((name) => ({ name })) as T[] };
           }
           return { success: true, results: [] as T[] };
@@ -161,7 +171,7 @@ async function saveProject(db: ReturnType<typeof projectSaveDb>) {
 }
 
 test("project save supports the live legacy D1 translation schema without language column", async () => {
-  const db = projectSaveDb(false);
+  const db = projectSaveDb(true, true);
   const response = await saveProject(db);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
@@ -172,10 +182,13 @@ test("project save supports the live legacy D1 translation schema without langua
   });
   assert.equal(db.translationQueries.length, 2);
   assert.ok(db.translationQueries.every((query) => !query.includes("language")));
+  assert.doesNotMatch(db.projectInsertQueries[0], /category_id|cover_object_key/);
+  assert.match(db.projectInsertQueries[0], /category_id/);
+  assert.match(db.projectInsertQueries[0], /cover_object_key/);
 });
 
 test("project save retains compatibility with fresh D1 schema containing language column", async () => {
-  const db = projectSaveDb(true);
+  const db = projectSaveDb(false, false);
   const response = await saveProject(db);
   assert.equal(response.status, 200);
   assert.equal(db.translationQueries.length, 2);
