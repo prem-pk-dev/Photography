@@ -1468,6 +1468,29 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
+  if (url.pathname === "/api/admin/projects/media/alt-text" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    const body = await readAdminJson(request, 4096);
+    const id = cleanText(body?.id, 80);
+    const altEn = cleanText(body?.altEn, 250);
+    const altHi = cleanText(body?.altHi, 250);
+    if (!id) return json({ error: "validation_failed" }, 400);
+    try {
+      const current = await env.DB.prepare("SELECT id FROM project_media WHERE id = ?").bind(id).first<{ id: string }>();
+      if (!current) return json({ error: "media_not_found" }, 404);
+      const results = await env.DB.batch([
+        env.DB.prepare("UPDATE project_media SET alt_en = ?, alt_hi = ? WHERE id = ?").bind(altEn, altHi, id),
+        env.DB.prepare("INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, 'media_alt_text_updated', 'media', ?)").bind(crypto.randomUUID(), admin.id, id),
+      ]);
+      if ((results[0]?.meta?.changes ?? 0) !== 1) return json({ error: "media_not_found" }, 404);
+      return json({ ok: true, id });
+    } catch {
+      return json({ error: "media_alt_text_update_unavailable" }, 503);
+    }
+  }
+
   if (url.pathname === "/api/admin/projects/media" && request.method === "POST") {
     if (!env.DB) return json({ error: "database_not_configured" }, 503);
     const admin = await currentAdmin(request, env);
