@@ -248,3 +248,127 @@ test("media alt text update rejects unauthenticated requests", async () => {
   }), { DB: makeDb() });
   assert.equal(response.status, 401);
 });
+
+
+function deleteMediaDb(record: { project_id: string; preview_url: string; original_key: string | null; cover_image_url: string }, role: "owner" | "editor" = "owner") {
+  const batchQueries: string[] = [];
+  return {
+    batchQueries,
+    prepare(query: string) {
+      return {
+        bind(..._values: unknown[]) { return this; },
+        async first<T>() {
+          if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) return { ...admin, role } as T;
+          if (query.includes("SELECT m.project_id, m.preview_url, m.original_key, p.cover_image_url")) return record as T;
+          return null as T | null;
+        },
+      };
+    },
+    async batch(_statements: unknown[]) {
+      batchQueries.push("2");
+      return [{ success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 1 } }];
+    },
+  };
+}
+
+const deleteProjectId = "11111111-1111-4111-8111-111111111111";
+const deleteMediaId = "22222222-2222-4222-8222-222222222222";
+const deleteKey = "projects/" + deleteProjectId + "/" + deleteMediaId + ".jpg";
+const deleteRecord = {
+  project_id: deleteProjectId,
+  preview_url: "https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/commit-sha/" + deleteKey,
+  original_key: deleteKey,
+  cover_image_url: "https://example.test/another-cover.jpg",
+};
+
+function deleteRequest() {
+  return new Request("https://example.test/api/admin/projects/media/delete", {
+    method: "POST",
+    headers: { cookie: "__Host-gf_admin=test-session", "content-type": "application/json" },
+    body: JSON.stringify({ id: deleteMediaId }),
+  });
+}
+
+test("permanent media deletion requires an authenticated owner", async () => {
+  const unauthenticated = await worker.fetch(new Request("https://example.test/api/admin/projects/media/delete", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: deleteMediaId }),
+  }), { DB: deleteMediaDb(deleteRecord), MEDIA_GITHUB_TOKEN: "test-token" });
+  assert.equal(unauthenticated.status, 401);
+  const forbidden = await worker.fetch(deleteRequest(), {
+    DB: deleteMediaDb(deleteRecord, "editor"), MEDIA_GITHUB_TOKEN: "test-token",
+  });
+  assert.equal(forbidden.status, 403);
+});
+
+test("permanent media deletion refuses project covers and legacy URL media before GitHub calls", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return new Response("unexpected", { status: 500 }); };
+  try {
+    const cover = await worker.fetch(deleteRequest(), {
+      DB: deleteMediaDb({ ...deleteRecord, cover_image_url: deleteRecord.preview_url }),
+      MEDIA_GITHUB_TOKEN: "test-token",
+    });
+    assert.equal(cover.status, 409);
+    const legacy = await worker.fetch(deleteRequest(), {
+      DB: deleteMediaDb({ ...deleteRecord, original_key: null, preview_url: "https://media-assets.example.test/legacy.jpg" }),
+      MEDIA_GITHUB_TOKEN: "test-token",
+    });
+    assert.equal(legacy.status, 409);
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("permanent media deletion removes the exact GitHub object then D1 metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; method: string; authorization: string }> = [];
+  const db = deleteMediaDb(deleteRecord);
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), method: init?.method || "GET", authorization: new Headers(init?.headers).get("authorization") || "" });
+    if (init?.method === "DELETE") return new Response(JSON.stringify({ commit: { sha: "deleted-commit" } }), { status: 200 });
+    return new Response(JSON.stringify({ sha: "blob-sha" }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(deleteRequest(), { DB: db, MEDIA_GITHUB_TOKEN: "test-token" });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, id: deleteMediaId, deletedFromRepository: true });
+    assert.deepEqual(calls.map((call) => call.method), ["GET", "DELETE"]);
+    assert.ok(calls.every((call) => call.url.endsWith(deleteKey.split("/").map(encodeURIComponent).join("/"))));
+    assert.ok(calls.every((call) => call.authorization === "Bearer test-token"));
+    assert.deepEqual(db.batchQueries, ["2"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("permanent media deletion can finish D1 cleanup after a previous GitHub deletion", async () => {
+  const originalFetch = globalThis.fetch;
+  const db = deleteMediaDb(deleteRecord);
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return new Response("not found", { status: 404 }); };
+  try {
+    const response = await worker.fetch(deleteRequest(), { DB: db, MEDIA_GITHUB_TOKEN: "test-token" });
+    assert.equal(response.status, 200);
+    assert.equal(calls, 1);
+    assert.deepEqual(db.batchQueries, ["2"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("permanent media deletion retains D1 metadata when GitHub refuses deletion", async () => {
+  const originalFetch = globalThis.fetch;
+  const db = deleteMediaDb(deleteRecord);
+  globalThis.fetch = async (_input, init) => init?.method === "DELETE"
+    ? new Response("conflict", { status: 409 })
+    : new Response(JSON.stringify({ sha: "blob-sha" }), { status: 200 });
+  try {
+    const response = await worker.fetch(deleteRequest(), { DB: db, MEDIA_GITHUB_TOKEN: "test-token" });
+    assert.equal(response.status, 503);
+    assert.deepEqual(db.batchQueries, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
