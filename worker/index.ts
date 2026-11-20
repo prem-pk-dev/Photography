@@ -1492,7 +1492,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       }
       const key = current.original_key;
       const keyMatch = key?.match(/^projects\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.(?:jpg|png|webp|gif|mp4|webm)$/i);
-      if (!keyMatch || keyMatch[1] !== current.project_id || keyMatch[2] !== id ||
+      if (!key || !keyMatch || keyMatch[1] !== current.project_id || keyMatch[2] !== id ||
           !current.preview_url.startsWith("https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/") ||
           !current.preview_url.endsWith("/" + key)) {
         return json({ error: "media_repository_file_not_managed" }, 409);
