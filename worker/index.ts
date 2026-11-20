@@ -1468,6 +1468,78 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
   }
 
+  if (url.pathname === "/api/admin/projects/media/delete" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    if (admin.role !== "owner") return json({ error: "forbidden" }, 403);
+    if (!env.MEDIA_GITHUB_TOKEN) return json({ error: "media_repository_not_configured" }, 503);
+    const body = await readAdminJson(request, 4096);
+    const id = cleanText(body?.id, 80);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      return json({ error: "validation_failed" }, 400);
+    }
+    try {
+      const current = await env.DB.prepare(
+        "SELECT m.project_id, m.preview_url, m.original_key, p.cover_image_url " +
+        "FROM project_media m JOIN projects p ON p.id = m.project_id WHERE m.id = ?"
+      ).bind(id).first<{
+        project_id: string; preview_url: string; original_key: string | null; cover_image_url: string;
+      }>();
+      if (!current) return json({ error: "media_not_found" }, 404);
+      if (current.preview_url === current.cover_image_url) {
+        return json({ error: "replace_cover_before_deleting" }, 409);
+      }
+      const key = current.original_key;
+      const keyMatch = key?.match(/^projects\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.(?:jpg|png|webp|gif|mp4|webm)$/i);
+      if (!keyMatch || keyMatch[1] !== current.project_id || keyMatch[2] !== id ||
+          !current.preview_url.startsWith("https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/") ||
+          !current.preview_url.endsWith("/" + key)) {
+        return json({ error: "media_repository_file_not_managed" }, 409);
+      }
+      const encodedPath = key.split("/").map(encodeURIComponent).join("/");
+      const githubUrl = "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath;
+      const headers = {
+        "accept": "application/vnd.github+json",
+        "user-agent": "Photography-Media-Uploader/1.0",
+        "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+        "x-github-api-version": "2022-11-28",
+      };
+      const lookup = await fetch(githubUrl, { method: "GET", headers });
+      if (lookup.status !== 404) {
+        if (!lookup.ok) return json({ error: "media_repository_lookup_failed", githubStatus: lookup.status }, 503);
+        const remote = await lookup.json() as { sha?: string };
+        if (!remote.sha) return json({ error: "media_repository_response_invalid" }, 503);
+        const removal = await fetch(githubUrl, {
+          method: "DELETE",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ message: "Permanently delete portfolio media " + id, sha: remote.sha, branch: "main" }),
+        });
+        if (!removal.ok && removal.status !== 404) {
+          return json({ error: "media_repository_delete_failed", githubStatus: removal.status }, 503);
+        }
+      }
+      // A retry after GitHub deletion but before D1 cleanup sees 404 and safely
+      // completes metadata cleanup. The path is bound to this exact project/media ID.
+      const results = await env.DB.batch([
+        env.DB.prepare(
+          "DELETE FROM project_media WHERE id = ? AND NOT EXISTS (" +
+          "SELECT 1 FROM projects WHERE id = ? AND cover_image_url = ?)"
+        ).bind(id, current.project_id, current.preview_url),
+        env.DB.prepare(
+          "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
+          "SELECT ?, ?, 'media_permanently_deleted', 'media', ? WHERE changes() = 1"
+        ).bind(crypto.randomUUID(), admin.id, id),
+      ]);
+      if ((results[0]?.meta?.changes ?? 0) !== 1) {
+        return json({ error: "replace_cover_before_deleting" }, 409);
+      }
+      return json({ ok: true, id, deletedFromRepository: true });
+    } catch {
+      return json({ error: "media_delete_unavailable" }, 503);
+    }
+  }
+
   if (url.pathname === "/api/admin/projects/media/alt-text" && request.method === "POST") {
     if (!env.DB) return json({ error: "database_not_configured" }, 503);
     const admin = await currentAdmin(request, env);
