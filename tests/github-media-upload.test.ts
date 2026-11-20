@@ -14,6 +14,7 @@ function makeDb() {
         async first<T>() {
           if (query.includes("SELECT u.id, u.email, u.role FROM admin_sessions")) return admin as T;
           if (query.includes("SELECT id, status FROM projects")) return { id: "project-1", status: "draft" } as T;
+          if (query.includes("SELECT id FROM project_media WHERE id = ?")) return { id: "media-1" } as T;
           return null as T | null;
         },
         async run() { return { success: true, meta: { changes: 1 } }; },
@@ -224,4 +225,26 @@ test("project save supports the modern D1 schema without legacy project columns"
   assert.equal(db.translationQueries.length, 2);
   assert.ok(db.translationQueries.every((query) => !query.includes("language")));
   assert.doesNotMatch(db.projectInsertQueries[0], /category_id|cover_object_key/);
+});
+
+
+test("media alt text update requires an authenticated admin and updates both locales", async () => {
+  const db = makeDb();
+  const response = await worker.fetch(new Request("https://example.test/api/admin/projects/media/alt-text", {
+    method: "POST",
+    headers: { cookie: "__Host-gf_admin=test-session", "content-type": "application/json" },
+    body: JSON.stringify({ id: "media-1", altEn: "Wedding celebration", altHi: "शादी का समारोह" }),
+  }), { DB: db });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, id: "media-1" });
+  assert.deepEqual(db.batches, [2]);
+});
+
+test("media alt text update rejects unauthenticated requests", async () => {
+  const response = await worker.fetch(new Request("https://example.test/api/admin/projects/media/alt-text", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "media-1", altEn: "Wedding", altHi: "शादी" }),
+  }), { DB: makeDb() });
+  assert.equal(response.status, 401);
 });
