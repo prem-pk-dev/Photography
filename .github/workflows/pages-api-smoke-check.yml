@@ -32,7 +32,6 @@ jobs:
           printf '%s\n' "$output"
           test "$status" -eq 2
           printf '%s' "$output" | grep -q 'Usage: node scripts/smoke-pages-api.mjs'
-
       - name: Validate script refuses non-HTTPS URLs safely
         shell: bash
         run: |
@@ -40,6 +39,6 @@ jobs:
           output=$(node scripts/smoke-pages-api.mjs http://example.test 2>&1)
           status=$?
           set -e
-          printf '%s\\n' "$output"
+          printf '%s\n' "$output"
           test "$status" -eq 2
           printf '%s' "$output" | grep -q 'Refusing to test a non-HTTPS URL'
