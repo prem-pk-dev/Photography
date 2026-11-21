@@ -1442,25 +1442,58 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       try {
         await env.DB.batch(statements);
       } catch {
-        await fetch(
-          "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
-          {
-            method: "DELETE",
-            headers: {
-              "accept": "application/vnd.github+json",
-              "user-agent": "Photography-Media-Uploader/1.0",
-              "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
-              "content-type": "application/json",
-              "x-github-api-version": "2022-11-28",
-            },
-            body: JSON.stringify({
-              message: "Rollback failed media metadata " + id,
-              sha: blobSha,
-              branch: "main",
-            }),
-          },
-        ).catch(() => undefined);
-        throw new Error("media_metadata_save_failed");
+        // Compensate for a repository upload whose D1 metadata transaction failed.
+        // A missing file means a previous compensation attempt already succeeded.
+        let cleanupConfirmed = false;
+        let cleanupStatus = 0;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const cleanup = await fetch(
+              "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
+              {
+                method: "DELETE",
+                headers: {
+                  "accept": "application/vnd.github+json",
+                  "user-agent": "Photography-Media-Uploader/1.0",
+                  "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+                  "content-type": "application/json",
+                  "x-github-api-version": "2022-11-28",
+                },
+                body: JSON.stringify({
+                  message: "Rollback failed media metadata " + id,
+                  sha: blobSha,
+                  branch: "main",
+                }),
+              },
+            );
+            cleanupStatus = cleanup.status;
+            if (cleanup.ok || cleanup.status === 404) {
+              cleanupConfirmed = true;
+              break;
+            }
+            if (cleanup.status !== 409 && cleanup.status < 500) break;
+          } catch {
+            cleanupStatus = 0;
+          }
+        }
+        if (!cleanupConfirmed) {
+          // Do not silently report a normal upload failure when the public file may remain.
+          console.error("media_upload_compensation_failed", {
+            mediaId: id,
+            repositoryPath: key,
+            blobSha,
+            githubStatus: cleanupStatus || undefined,
+          });
+          return json({
+            error: "media_upload_cleanup_required",
+            cleanupRequired: true,
+            mediaId: id,
+            repositoryPath: key,
+            blobSha,
+            githubStatus: cleanupStatus || undefined,
+          }, 503);
+        }
+        return json({ error: "media_metadata_save_failed", cleanupConfirmed: true }, 503);
       }
       return json({ ok: true, id, previewUrl, mediaType, isPublic, isCover }, 201);
     } catch {
