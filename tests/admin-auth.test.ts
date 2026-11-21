@@ -74,6 +74,27 @@ function mockDbWithAuthenticatedSession() {
   };
 }
 
+function mockDbWithSetupValidation() {
+  let batchCalls = 0;
+  const queries: string[] = [];
+  return {
+    queries,
+    get batchCalls() { return batchCalls; },
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { queries.push(query); return this; },
+        async first<T>() {
+          if (query.includes("INSERT INTO auth_rate_limits")) return { request_count: 1 } as T;
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; }
+      };
+    },
+    async batch(_statements: unknown[]) { batchCalls += 1; return []; }
+  };
+}
+
 function mockDbWithOwnerSetupBatch(insertChanges = 1) {
   const statements: string[] = [];
   return {
@@ -217,6 +238,30 @@ test("public content endpoint rejects unknown page slugs", async () => {
   assert.deepEqual(await response.json(), { error: "invalid_page" });
 });
 
+
+test("initial owner setup rejects invalid email and short passwords before database writes", async () => {
+  const invalidInputs = [
+    { email: "not-an-email", password: "long-secure-password-123" },
+    { email: "owner@example.test", password: "short" }
+  ];
+
+  for (const input of invalidInputs) {
+    const db = mockDbWithSetupValidation();
+    const response = await worker.fetch(new Request("https://example.test/api/admin/setup", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-setup-secret": "expected-secret" },
+      body: JSON.stringify(input)
+    }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "validation_failed",
+      requirements: "Use a valid email and a 14–128 character password."
+    });
+    assert.equal(db.batchCalls, 0);
+    assert.equal(db.queries.some(query => query.includes("INSERT INTO admin_users")), false);
+  }
+});
 
 test("initial owner setup fails closed when transactional D1 batch is unavailable", async () => {
   const db = mockDbWithAvailableAuthRateLimit();
