@@ -4,7 +4,7 @@ import worker from "../worker/index.ts";
 
 const admin = { id: "admin-1", email: "owner@example.test", role: "owner" as const };
 
-function makeDb() {
+function makeDb(batchFails = false) {
   const batches: number[] = [];
   return {
     batches,
@@ -23,6 +23,7 @@ function makeDb() {
     },
     async batch(statements: unknown[]) {
       batches.push(statements.length);
+      if (batchFails) throw new Error("simulated D1 batch failure");
       return statements.map(() => ({ success: true, meta: { changes: 1 } }));
     },
   };
