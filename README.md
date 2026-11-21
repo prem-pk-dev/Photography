@@ -1,12 +1,20 @@
 # Golden Films
 
-A premium cinematic, bilingual (English/Hindi) photography, videography, photo-editing and video-editing portfolio for Sunil.
+A bilingual (English/Hindi) photography, videography, photo-editing and video-editing portfolio for Sunil.
 
 ## Current milestone
 
-The responsive portfolio UI prototype and Cloudflare Workers API foundation are in the main branch. The UI includes 14 portfolio categories, services, sample-labelled demo imagery, an English/Hindi switcher, and an enquiry form wired to `POST /api/enquiries`.
+The responsive portfolio frontend and Cloudflare Pages Functions API bridge are in the main branch. The UI includes 14 portfolio categories, services, sample-labelled demo imagery, an English/Hindi switcher, and an enquiry form wired to `POST /api/enquiries`.
 
-The API validates enquiry input and is designed to store submissions in D1. The Wrangler configuration references the existing `golden-films-db` database in the connected Cloudflare account. A read-only inspection on 2026-10-28 found a pre-existing/legacy schema (including 14 category rows and tables such as `project_media`, `admin_users`, and `site_settings`) whose column names and constraints do not match the current `migrations/0001_initial_schema.sql` and Worker queries. The latest direct database-details response reports `num_tables: 12`, matching the 12 application tables in the SQL catalog when Cloudflare's internal `_cf_KV` table is excluded; an earlier metadata response reported zero, so that discrepancy remains documented for preflight. The SQL catalog is the current direct schema evidence. Do not apply the current baseline migration to this database until schema ownership, migration history, a verified export/restore, and a compatibility plan have been reviewed. **No D1 export was started during the 2026-10-29 read-only audit; the SQL export has not been downloaded or restore-verified.** A D1 export may temporarily make the database unavailable, so do not start one without a deliberately planned maintenance window. No data was written during inspection. The Worker is not deployed.
+The API foundation, admin authentication/CMS routes, GitHub-backed media workflow, and read-only Pages API smoke checks are implemented in the repository. Production Pages deployment metadata confirms that Pages Functions are active and the `DB` binding points to the existing `golden-films-db` D1 database. A manual, GET-only Pages API smoke workflow against Preview was subsequently reported successful by the repository owner (green GitHub Actions check, 2026-11-21). This Preview result must not be interpreted as proof that authenticated admin/CMS flows or Production writes have been validated.
+
+## Production D1 safety status
+
+Production D1: `golden-films-db` (ID `0241231b-6e6c-410b-a5ac-958eeb424a78`).
+
+A read-only catalog/PRAGMA audit on 2026-11-21 confirmed the queried Worker-facing tables and columns, including categories, projects, translations, project media, enquiries, admin users/sessions, CMS content/revisions, and rate-limit/audit tables. The audit reported `changed_db: false` and `rows_written: 0`; no row contents were read.
+
+The `d1_migrations` history table was absent. No Production export has yet been downloaded and restored into a separate disposable D1 database. The exact historical migration path and data-preservation behavior therefore remain unverified. **Do not apply baseline migrations `0001`–`0006` blindly to Production.** First plan an approved export/maintenance window, restore to a disposable database, test the exact forward-only migration, and verify data preservation and integrity. Obtain explicit approval before any Production D1 write/migration, secret change, or binding change.
 
 ## Local development
 
@@ -21,28 +29,32 @@ npm run build
 npm run preview
 ```
 
-Run the Worker locally only after configuring a test database and the required environment secrets. The Postman collection defaults to `http://127.0.0.1:8787`; its valid-enquiry request writes to the configured database, so use a test database rather than production.
+Run the Worker locally only after configuring a separate test database and required environment secrets. The Postman collection defaults to `http://127.0.0.1:8787`; its valid-enquiry request writes to the configured database, so use a test database rather than Production.
 
-## Planned architecture
+## Architecture
 
-- React + TypeScript + Vite frontend
-- Cloudflare Workers API
-- Cloudflare D1 for categories, projects, translations and enquiries
-- Cloudflare R2 for media only after free-tier limits and billing requirements are verified
-- GitHub feature branches, pull requests and CI checks
-- Postman collection for API regression tests
+- React + TypeScript + Vite frontend, deployed on Cloudflare Pages
+- Cloudflare Pages Functions API bridge to the shared Worker handler
+- Cloudflare D1 for categories, projects, translations, enquiries, admin and CMS data
+- GitHub-backed media storage workflow; the GitHub token remains server-side
+- Cloudflare R2 is explicitly on hold; do not enable paid or billable resources
+- GitHub feature branches, pull requests, and CI checks
+- Postman collection and automated regression tests for API verification
 
 ## Budget requirement
 
-The project must remain at ₹0. Do not enable paid plans, subscriptions, billing, or billable resources without explicit approval. If a feature cannot be delivered safely within the free tier, defer it or choose a free alternative.
+The project must remain at **₹0**. Do not enable paid plans, subscriptions, billing, or billable resources without explicit approval. If a feature cannot be delivered safely within the free tier, defer it or choose a free alternative. Avoid exhausting provider usage limits.
 
 ## Demo media
 
-All placeholder/demo media must be clearly labeled as sample content and must not be represented as Sunil's real work. Replace remote sample images with licensed, generated, or owner-provided assets before production launch.
+All placeholder/demo media must be clearly labelled as sample content and must not be represented as Sunil's real work. Replace remote sample images with licensed, generated, or owner-provided assets before production launch.
 
-## Current limitations
+## Current limitations and verification gates
 
 - Real phone, WhatsApp, email and Instagram details have not been provided.
-- The static Cloudflare Pages portfolio is deployed, but the Worker API is not deployed/connected to the production Pages routes. The Wrangler configuration references the D1 database, but Pages runtime D1 binding and `ADMIN_SETUP_SECRET` are not configured. The live D1 database has a legacy schema mismatch; do not apply migrations until a verified export has been restored and the exact forward migration passes against a disposable copy.
-- Admin authentication, owner/editor authorization, the CMS, revision history, admin audit view and optional R2 upload code exist in the repository, but they are not confirmed working in production because the API bridge and runtime bindings are not active. Password recovery, email verification and email notifications remain unimplemented.
-- No paid Cloudflare resource is enabled. The static site deployment does not establish API or database readiness.
+- The Preview Pages API read-only smoke workflow has passed according to the owner. The script checks `GET /api/health`, `GET /api/ready`, and `GET /api/content?page=home`; it refuses non-HTTPS URLs and redirects.
+- Live authenticated browser/API E2E remains unverified: owner setup, login/session/logout, rate limiting/audit events, CMS revisions/publish, and owner/editor permission boundaries still need isolated Preview verification.
+- Non-destructive GitHub-backed media upload/read/alt-text verification against a disposable Preview project remains pending. Do not modify existing portfolio media during testing.
+- Production D1 migration rehearsal remains blocked pending an approved export restored into a disposable database and a successful exact forward-migration test. Never use Production D1 for Preview testing.
+- Password recovery, email verification, and email notifications remain unimplemented.
+- No paid Cloudflare resource is enabled. R2 remains on hold.
