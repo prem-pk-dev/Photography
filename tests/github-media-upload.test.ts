@@ -140,6 +140,61 @@ test("GitHub media upload retries a transient branch ref conflict", async () => 
 });
 
 
+
+test("upload compensation confirms a successful repository rollback after D1 failure", async () => {
+  const originalFetch = globalThis.fetch;
+  const methods: string[] = [];
+  globalThis.fetch = async (_input, init) => {
+    methods.push(init?.method || "GET");
+    return init?.method === "DELETE" ? new Response(null, { status: 204 }) :
+      new Response(JSON.stringify({ content: { sha: "blob-sha" }, commit: { sha: "commit-sha" } }), { status: 201 });
+  };
+  try {
+    const response = await worker.fetch(uploadRequest([137, 80, 78, 71, 13, 10, 26, 10, 0]), { DB: makeDb(true), MEDIA_GITHUB_TOKEN: "test-token" });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "media_metadata_save_failed", cleanupConfirmed: true });
+    assert.deepEqual(methods, ["PUT", "DELETE"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("upload compensation reports actionable details when GitHub refuses cleanup", async () => {
+  const originalFetch = globalThis.fetch;
+  let deletes = 0;
+  globalThis.fetch = async (_input, init) => {
+    if (init?.method === "DELETE") { deletes += 1; return new Response("forbidden", { status: 403 }); }
+    return new Response(JSON.stringify({ content: { sha: "blob-sha" }, commit: { sha: "commit-sha" } }), { status: 201 });
+  };
+  try {
+    const response = await worker.fetch(uploadRequest([137, 80, 78, 71, 13, 10, 26, 10, 0]), { DB: makeDb(true), MEDIA_GITHUB_TOKEN: "test-token" });
+    const result = await response.json() as { error: string; cleanupRequired: boolean; repositoryPath: string; blobSha: string; githubStatus: number };
+    assert.equal(response.status, 503);
+    assert.equal(result.error, "media_upload_cleanup_required");
+    assert.equal(result.cleanupRequired, true);
+    assert.match(result.repositoryPath, /^projects\/project-1\//);
+    assert.equal(result.blobSha, "blob-sha");
+    assert.equal(result.githubStatus, 403);
+    assert.equal(deletes, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("upload compensation retries transient network failures and reports if cleanup remains unconfirmed", async () => {
+  const originalFetch = globalThis.fetch;
+  let deletes = 0;
+  globalThis.fetch = async (_input, init) => {
+    if (init?.method === "DELETE") { deletes += 1; throw new Error("network unavailable"); }
+    return new Response(JSON.stringify({ content: { sha: "blob-sha" }, commit: { sha: "commit-sha" } }), { status: 201 });
+  };
+  try {
+    const response = await worker.fetch(uploadRequest([137, 80, 78, 71, 13, 10, 26, 10, 0]), { DB: makeDb(true), MEDIA_GITHUB_TOKEN: "test-token" });
+    const result = await response.json() as { error: string; cleanupRequired: boolean; githubStatus?: number };
+    assert.equal(response.status, 503);
+    assert.equal(result.error, "media_upload_cleanup_required");
+    assert.equal(result.cleanupRequired, true);
+    assert.equal(result.githubStatus, undefined);
+    assert.equal(deletes, 3);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 function projectSaveDb(hasLanguageColumn: boolean, hasLegacyProjectColumns: boolean) {
   const translationQueries: string[] = [];
   const projectInsertQueries: string[] = [];
