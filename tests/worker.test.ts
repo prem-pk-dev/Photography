@@ -9,7 +9,7 @@ test("health endpoint responds and includes security headers", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
   assert.equal(response.headers.get("Cache-Control"), "no-store");
-  assert.match(response.headers.get("Content-Type") ?? "", /^application\\/json\\s*;?/i);
+  assert.ok((response.headers.get("Content-Type") ?? "").toLowerCase().includes("application/json"));
   assert.deepEqual(await response.json(), { status: "ok", service: "golden-films-api" });
 });
 
