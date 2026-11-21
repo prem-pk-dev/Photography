@@ -8,7 +8,7 @@
  * This script sends GET requests only. It never creates an admin, submits an
  * enquiry, changes content, or performs any database write.
  */
-import { validateReadiness } from "./pages-api-smoke-contract.mjs";
+import { validateReadiness, validateUnauthenticatedAdminSession } from "./pages-api-smoke-contract.mjs";
 
 const rawBaseUrl = process.argv[2] ?? process.env.PAGES_BASE_URL;
 if (!rawBaseUrl) {
@@ -55,6 +55,15 @@ const checks = [
     },
   },
   {
+    name: "GET /api/admin/session (unauthenticated)",
+    path: "/api/admin/session",
+    expectedStatus: 401,
+    validate: async (response) => {
+      const body = await response.json();
+      validateUnauthenticatedAdminSession(body);
+    },
+  },
+  {
     name: "GET /api/content?page=home",
     path: "/api/content?page=home",
     validate: async (response) => {
@@ -81,7 +90,10 @@ for (const check of checks) {
       signal: AbortSignal.timeout(10_000),
       redirect: "error",
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const expectedStatus = check.expectedStatus ?? 200;
+    if (response.status !== expectedStatus) {
+      throw new Error(`expected HTTP ${expectedStatus}, got HTTP ${response.status}`);
+    }
     if (response.headers.get("x-content-type-options") !== "nosniff") {
       throw new Error("missing X-Content-Type-Options: nosniff");
     }
