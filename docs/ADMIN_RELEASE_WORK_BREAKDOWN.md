@@ -12,8 +12,8 @@ Last refreshed: **2026-11-21**
 - [x] Old API bridge draft PR #63 closed as superseded by main and PR #94/#95.
 - [x] Old Supabase Storage draft PR #87 closed as superseded by the selected GitHub media architecture. Its source branch was retained; no Supabase Storage integration was activated.
 - [x] Production Pages deployment for main commit `8243a08a9ee076c1acabde32611ad5aa8996f765` completed successfully and reports `uses_functions: true`.
+- [x] Manual Pages API read-only smoke workflow completed successfully with a green check after PR #99 was merged (user-confirmed 2026-11-21). The run ID and exact tested URL were not recorded in this document.
 - [ ] Live authenticated browser/API E2E for owner setup, login, session, logout, CMS revision/publish, and role boundaries remains unverified in the current continuation.
-- [ ] Read-only Pages API smoke script has not yet been run against the current Preview API from a permitted external client. CI tests only verify safe input handling; they do not make external requests.
 - [ ] Production D1 migration rehearsal remains blocked until an approved export is restored into a disposable database and the exact forward migration is tested for data preservation and integrity.
 - [x] R2 integration remains on hold; no R2 enablement or paid subscription is planned.
 
@@ -45,8 +45,8 @@ See [Production D1 Migration Gate](./PRODUCTION_D1_MIGRATION_GATE.md) for the fu
 - [x] Pages Functions catch-all route delegates `/api/*` to the shared Worker handler and is in main.
 - [x] Production deployment metadata confirms Functions are active and the D1 binding is present.
 - [x] `scripts/smoke-pages-api.mjs` is available. It performs GET-only checks for `/api/health`, `/api/ready`, and `/api/content?page=home`; it refuses non-HTTPS URLs and redirects.
-- [ ] Run the smoke script against the exact current Preview deployment from a permitted external client. Record the exact URL and output. Do not claim API readiness from build/deployment metadata alone.
-- [ ] If the Preview smoke test fails, diagnose Preview bindings/schema without changing Production.
+- [x] Manual Pages API read-only smoke workflow passed with a green check after PR #99 fixed the readiness response contract. This is user-confirmed workflow status; retain the run URL/output separately if detailed evidence is needed.
+- [ ] If a future Preview smoke test fails, diagnose Preview bindings/schema without changing Production.
 
 ### Authentication and CMS
 
