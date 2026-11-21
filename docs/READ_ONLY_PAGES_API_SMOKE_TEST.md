@@ -16,4 +16,4 @@ It rejects non-HTTPS URLs, fails on redirects, applies a 10-second timeout per r
 
 A passing smoke test is runtime evidence for the exact URL tested only. It does not validate a Production migration, prove all schema/data safety gates, or authorize database writes. Run against Preview first; Production checks should remain read-only and only be performed when explicitly approved.
 
-The pull-request workflow validates script syntax and safe refusal behavior without making external requests or consuming Pages/D1 resources.
+The repository's pull-request CI runs these script tests locally. They validate safe input handling without making external requests or consuming Pages/D1 resources.
