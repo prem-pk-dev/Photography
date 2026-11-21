@@ -28,3 +28,30 @@ test("Pages API smoke test rejects malformed URLs before making requests", () =>
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Base URL is invalid/);
 });
+
+import { validateReadiness } from "../scripts/pages-api-smoke-contract.mjs";
+
+test("readiness accepts the actual core-ready API response and reports optional booking as a warning", () => {
+  const warnings = validateReadiness({
+    status: "ok",
+    readiness: "ready",
+    schema: "legacy-compatible",
+    capabilities: { customerBooking: false },
+    disabledFeatures: ["customer_booking"],
+  });
+  assert.deepEqual(warnings, ["customer_booking"]);
+});
+
+test("readiness rejects a non-ready API response", () => {
+  assert.throws(
+    () => validateReadiness({ status: "ok", readiness: "not_ready", schema: "legacy-compatible" }),
+    /expected readiness="ready"/,
+  );
+});
+
+test("readiness rejects an incompatible core schema", () => {
+  assert.throws(
+    () => validateReadiness({ status: "ok", readiness: "ready", schema: "incompatible" }),
+    /schema="legacy-compatible"/,
+  );
+});
