@@ -16,3 +16,14 @@ export function validateReadiness(body) {
   }
   return warnings;
 }
+
+
+/** Validate that the public admin-session endpoint does not authenticate a caller without a cookie. */
+export function validateUnauthenticatedAdminSession(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error("expected a JSON object");
+  }
+  if (body.authenticated !== false) {
+    throw new Error(`expected authenticated=false, got ${JSON.stringify(body)}`);
+  }
+}
