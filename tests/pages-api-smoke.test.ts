@@ -29,7 +29,7 @@ test("Pages API smoke test rejects malformed URLs before making requests", () =>
   assert.match(result.stderr, /Base URL is invalid/);
 });
 
-import { validateReadiness } from "../scripts/pages-api-smoke-contract.mjs";
+import { validateReadiness, validateUnauthenticatedAdminSession } from "../scripts/pages-api-smoke-contract.mjs";
 
 test("readiness accepts the actual core-ready API response and reports optional booking as a warning", () => {
   const warnings = validateReadiness({
@@ -54,4 +54,20 @@ test("readiness rejects an incompatible core schema", () => {
     () => validateReadiness({ status: "ok", readiness: "ready", schema: "incompatible" }),
     /schema="legacy-compatible"/,
   );
+});
+
+
+test("unauthenticated admin session accepts the expected response", () => {
+  assert.doesNotThrow(() => validateUnauthenticatedAdminSession({ authenticated: false }));
+});
+
+test("unauthenticated admin session rejects an authenticated response", () => {
+  assert.throws(
+    () => validateUnauthenticatedAdminSession({ authenticated: true, admin: { role: "owner" } }),
+    /expected authenticated=false/,
+  );
+});
+
+test("unauthenticated admin session rejects malformed responses", () => {
+  assert.throws(() => validateUnauthenticatedAdminSession(null), /expected a JSON object/);
 });
