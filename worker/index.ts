@@ -39,6 +39,7 @@ interface Env {
   DB?: D1Binding;
   ASSETS?: StaticAssetsBinding;
   MEDIA_BUCKET?: R2BucketBinding;
+  MEDIA_GITHUB_TOKEN?: string;
   ADMIN_SETUP_SECRET?: string;
 }
 
@@ -865,6 +866,14 @@ async function handleContentApi(request: Request, env: Env, url: URL): Promise<R
   return null;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(binary);
+}
+
 async function handleApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const origin = request.headers.get("origin");
@@ -1260,23 +1269,58 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const category = await env.DB.prepare("SELECT slug FROM categories WHERE slug = ?").bind(categorySlug).first<{ slug: string }>();
       if (!category) return json({ error: "invalid_category" }, 400);
       const projectId = crypto.randomUUID();
-      const project = await env.DB.prepare(
-        "INSERT INTO projects (id, slug, category_slug, cover_image_url, status, is_featured, location, project_date, demo_label, updated_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) " +
-        "ON CONFLICT(slug) DO UPDATE SET category_slug = excluded.category_slug, cover_image_url = excluded.cover_image_url, " +
-        "status = excluded.status, is_featured = excluded.is_featured, location = excluded.location, project_date = excluded.project_date, " +
-        "demo_label = excluded.demo_label, updated_at = datetime('now') RETURNING id"
-      ).bind(projectId, slug, categorySlug, coverImageUrl, status, body?.isFeatured === true ? 1 : 0, location || null, projectDate || null, demoLabel)
+      // The Preview D1 still has required legacy columns category_id and cover_object_key;
+      // the newer D1 schema has category_slug and cover_image_url instead. Build the
+      // INSERT from the actual table shape so both supported schemas remain writable.
+      const projectInfo = await env.DB.prepare("PRAGMA table_info(projects)").all<{ name: string }>();
+      const projectColumns = new Set((projectInfo.results ?? []).map((column) => column.name));
+      const projectValues: Array<[string, unknown]> = [["id", projectId], ["slug", slug]];
+      const addProjectValue = (column: string, value: unknown) => {
+        if (projectColumns.has(column)) projectValues.push([column, value]);
+      };
+      addProjectValue("category_id", categorySlug);
+      addProjectValue("category_slug", categorySlug);
+      addProjectValue("cover_object_key", `github-cover/${slug}`);
+      addProjectValue("cover_image_url", coverImageUrl);
+      addProjectValue("status", status);
+      addProjectValue("is_featured", body?.isFeatured === true ? 1 : 0);
+      addProjectValue("location", location || null);
+      addProjectValue("project_date", projectDate || null);
+      addProjectValue("demo_label", demoLabel);
+      const insertColumns = projectValues.map(([column]) => column);
+      const insertValues = projectValues.map(([, value]) => value);
+      const insertExpressions = insertValues.map(() => "?");
+      if (projectColumns.has("updated_at")) {
+        insertColumns.push("updated_at");
+        insertExpressions.push("datetime('now')");
+      }
+      const updateColumns = insertColumns.filter((column) => !["id", "slug"].includes(column));
+      const updateAssignments = updateColumns.map((column) =>
+        column === "updated_at" ? "updated_at = datetime('now')" : `${column} = excluded.${column}`
+      );
+      const insertSql =
+        `INSERT INTO projects (${insertColumns.join(", ")}) VALUES (${insertExpressions.join(", ")}) ` +
+        `ON CONFLICT(slug) DO UPDATE SET ${updateAssignments.join(", ")} RETURNING id`;
+      const project = await env.DB.prepare(insertSql).bind(...insertValues)
         .first<{ id: string }>();
       if (!project?.id) return json({ error: "project_save_unavailable" }, 503);
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'en', 'en', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleEn, descriptionEn).run();
-      await env.DB.prepare(
-        "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, 'hi', 'hi', ?, ?) " +
-        "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
-      ).bind(project.id, titleHi, descriptionHi).run();
+      // Production's legacy D1 schema has only (project_id, locale, title, description),
+      // while fresh installs retain the legacy NOT NULL language column as well.
+      // Detect the deployed shape instead of assuming one schema across environments.
+      const translationInfo = await env.DB.prepare("PRAGMA table_info(project_translations)").all<{ name: string }>();
+      const hasLanguageColumn = (translationInfo.results ?? []).some((column) => column.name === "language");
+      const translationSql = hasLanguageColumn
+        ? "INSERT INTO project_translations (project_id, language, locale, title, description) VALUES (?, ?, ?, ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description"
+        : "INSERT INTO project_translations (project_id, locale, title, description) VALUES (?, ?, ?, ?) " +
+          "ON CONFLICT(project_id, locale) DO UPDATE SET title = excluded.title, description = excluded.description";
+      if (hasLanguageColumn) {
+        await env.DB.prepare(translationSql).bind(project.id, "en", "en", titleEn, descriptionEn).run();
+        await env.DB.prepare(translationSql).bind(project.id, "hi", "hi", titleHi, descriptionHi).run();
+      } else {
+        await env.DB.prepare(translationSql).bind(project.id, "en", titleEn, descriptionEn).run();
+        await env.DB.prepare(translationSql).bind(project.id, "hi", titleHi, descriptionHi).run();
+      }
       await env.DB.prepare(
         "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'project', ?)"
       ).bind(crypto.randomUUID(), admin.id, status === "published" ? "project_published" : "project_saved_draft", project.id).run();
@@ -1291,7 +1335,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     if (!env.DB) return json({ error: "database_not_configured" }, 503);
     const admin = await currentAdmin(request, env);
     if (!admin) return json({ error: "unauthorized" }, 401);
-    if (!env.MEDIA_BUCKET) return json({ error: "media_storage_not_configured" }, 503);
+    if (!env.MEDIA_GITHUB_TOKEN) return json({ error: "media_storage_not_configured" }, 503);
     const declaredLength = Number(request.headers.get("content-length") ?? "0");
     if (declaredLength > 20 * 1024 * 1024 + 64 * 1024) return json({ error: "file_too_large" }, 413);
     let form: FormData;
@@ -1310,42 +1354,245 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
       "video/mp4": "mp4", "video/webm": "webm",
     };
-    const extension = mimeExtensions[file.type.toLowerCase()];
+    const mimeType = file.type.toLowerCase();
+    const extension = mimeExtensions[mimeType];
     if (!extension) return json({ error: "unsupported_media_type", allowed: Object.keys(mimeExtensions) }, 415);
-    const mediaType = file.type.startsWith("video/") ? "video" : "image";
+    const mediaType = mimeType.startsWith("video/") ? "video" : "image";
     if (!await hasValidMediaSignature(file)) return json({ error: "file_signature_mismatch" }, 415);
     if ((isPublic || isCover) && admin.role !== "owner") return json({ error: "forbidden" }, 403);
+    if (isCover && mediaType !== "image") return json({ error: "cover_must_be_image" }, 400);
+    if (isCover && !isPublic) return json({ error: "cover_must_be_public" }, 400);
+
     try {
-      const project = await env.DB.prepare("SELECT id, status FROM projects WHERE id = ?").bind(projectId).first<{ id: string; status: string }>();
+      const project = await env.DB.prepare("SELECT id, status FROM projects WHERE id = ?")
+        .bind(projectId).first<{ id: string; status: string }>();
       if (!project) return json({ error: "project_not_found" }, 404);
-      if (isCover && mediaType !== "image") return json({ error: "cover_must_be_image" }, 400);
-      if (isCover && !isPublic) return json({ error: "cover_must_be_public" }, 400);
+
       const id = crypto.randomUUID();
       const key = "projects/" + projectId + "/" + id + "." + extension;
-      await env.MEDIA_BUCKET.put(key, file.stream(), {
-        httpMetadata: { contentType: file.type.toLowerCase() },
-        customMetadata: { projectId, mediaId: id, uploadedBy: admin.id },
-      });
-      const previewUrl = "/api/media/" + key;
-      try {
-        await env.DB.prepare(
+      const encodedPath = key.split("/").map(encodeURIComponent).join("/");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const githubUploadUrl =
+        "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath;
+      const githubUploadInit: RequestInit = {
+        method: "PUT",
+        headers: {
+          "accept": "application/vnd.github+json",
+          "user-agent": "Photography-Media-Uploader/1.0",
+          "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+          "content-type": "application/json",
+          "x-github-api-version": "2022-11-28",
+        },
+        body: JSON.stringify({
+          message: "Upload portfolio media " + id,
+          content: bytesToBase64(bytes),
+          branch: "main",
+        }),
+      };
+      // GitHub can return 409 when another upload advances main between
+      // preparing the Contents API write and updating the branch ref. The
+      // destination path is unique, so retry the identical PUT a few times.
+      let uploadResponse: Response;
+      for (let attempt = 0; ; attempt += 1) {
+        uploadResponse = await fetch(githubUploadUrl, githubUploadInit);
+        if (uploadResponse.status !== 409 || attempt >= 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+      if (!uploadResponse.ok) {
+        const githubBody = await uploadResponse.text().catch(() => "");
+        let githubError: { message?: unknown } | null = null;
+        try {
+          githubError = JSON.parse(githubBody) as { message?: unknown };
+        } catch {
+          githubError = null;
+        }
+        const fallbackMessage = githubBody.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
+        const githubMessage = typeof githubError?.message === "string"
+          ? githubError.message.slice(0, 240)
+          : (fallbackMessage || "GitHub rejected the repository upload.").slice(0, 240);
+        return json({
+          error: "media_repository_upload_failed",
+          githubStatus: uploadResponse.status,
+          githubMessage,
+          githubRequestId: uploadResponse.headers.get("x-github-request-id") || undefined,
+        }, 503);
+      }
+      const uploaded = await uploadResponse.json() as {
+        content?: { sha?: string };
+        commit?: { sha?: string };
+      };
+      const blobSha = uploaded.content?.sha;
+      const commitSha = uploaded.commit?.sha;
+      if (!blobSha || !commitSha) return json({ error: "media_repository_response_invalid" }, 503);
+
+      const previewUrl = "https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/" +
+        commitSha + "/" + encodedPath;
+      const statements = [
+        env.DB.prepare(
           "INSERT INTO project_media (id, project_id, media_type, preview_url, original_key, alt_en, alt_hi, sort_order, is_public) " +
           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, projectId, mediaType, previewUrl, key, altEn, altHi, sortOrder, isPublic ? 1 : 0).run();
-        if (isCover) {
-          await env.DB.prepare("UPDATE projects SET cover_image_url = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(previewUrl, projectId).run();
-        }
-        await env.DB.prepare(
+        ).bind(id, projectId, mediaType, previewUrl, key, altEn, altHi, sortOrder, isPublic ? 1 : 0),
+        ...(isCover ? [env.DB.prepare(
+          "UPDATE projects SET cover_image_url = ?, updated_at = datetime('now') WHERE id = ?"
+        ).bind(previewUrl, projectId)] : []),
+        env.DB.prepare(
           "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, ?, 'media', ?)"
-        ).bind(crypto.randomUUID(), admin.id, isPublic ? "media_uploaded_public" : "media_uploaded_draft", id).run();
-      } catch (error) {
-        await env.MEDIA_BUCKET.delete(key).catch(() => undefined);
-        throw error;
+        ).bind(crypto.randomUUID(), admin.id, isPublic ? "media_uploaded_public" : "media_uploaded_draft", id),
+      ];
+      try {
+        await env.DB.batch(statements);
+      } catch {
+        // Compensate for a repository upload whose D1 metadata transaction failed.
+        // A missing file means a previous compensation attempt already succeeded.
+        let cleanupConfirmed = false;
+        let cleanupStatus = 0;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const cleanup = await fetch(
+              "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath,
+              {
+                method: "DELETE",
+                headers: {
+                  "accept": "application/vnd.github+json",
+                  "user-agent": "Photography-Media-Uploader/1.0",
+                  "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+                  "content-type": "application/json",
+                  "x-github-api-version": "2022-11-28",
+                },
+                body: JSON.stringify({
+                  message: "Rollback failed media metadata " + id,
+                  sha: blobSha,
+                  branch: "main",
+                }),
+              },
+            );
+            cleanupStatus = cleanup.status;
+            if (cleanup.ok || cleanup.status === 404) {
+              cleanupConfirmed = true;
+              break;
+            }
+            if (cleanup.status !== 409 && cleanup.status < 500) break;
+          } catch {
+            cleanupStatus = 0;
+          }
+        }
+        if (!cleanupConfirmed) {
+          // Do not silently report a normal upload failure when the public file may remain.
+          console.error("media_upload_compensation_failed", {
+            mediaId: id,
+            repositoryPath: key,
+            blobSha,
+            githubStatus: cleanupStatus || undefined,
+          });
+          return json({
+            error: "media_upload_cleanup_required",
+            cleanupRequired: true,
+            mediaId: id,
+            repositoryPath: key,
+            blobSha,
+            githubStatus: cleanupStatus || undefined,
+          }, 503);
+        }
+        return json({ error: "media_metadata_save_failed", cleanupConfirmed: true }, 503);
       }
       return json({ ok: true, id, previewUrl, mediaType, isPublic, isCover }, 201);
     } catch {
       return json({ error: "media_upload_unavailable" }, 503);
+    }
+  }
+
+  if (url.pathname === "/api/admin/projects/media/delete" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    if (admin.role !== "owner") return json({ error: "forbidden" }, 403);
+    if (!env.MEDIA_GITHUB_TOKEN) return json({ error: "media_repository_not_configured" }, 503);
+    const body = await readAdminJson(request, 4096);
+    const id = cleanText(body?.id, 80);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      return json({ error: "validation_failed" }, 400);
+    }
+    try {
+      const current = await env.DB.prepare(
+        "SELECT m.project_id, m.preview_url, m.original_key, p.cover_image_url " +
+        "FROM project_media m JOIN projects p ON p.id = m.project_id WHERE m.id = ?"
+      ).bind(id).first<{
+        project_id: string; preview_url: string; original_key: string | null; cover_image_url: string;
+      }>();
+      if (!current) return json({ error: "media_not_found" }, 404);
+      if (current.preview_url === current.cover_image_url) {
+        return json({ error: "replace_cover_before_deleting" }, 409);
+      }
+      const key = current.original_key;
+      const keyMatch = key?.match(/^projects\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.(?:jpg|png|webp|gif|mp4|webm)$/i);
+      if (!key || !keyMatch || keyMatch[1] !== current.project_id || keyMatch[2] !== id ||
+          !current.preview_url.startsWith("https://raw.githubusercontent.com/prem-pk-dev/PHOTOGRAPHY-MEDIA/") ||
+          !current.preview_url.endsWith("/" + key)) {
+        return json({ error: "media_repository_file_not_managed" }, 409);
+      }
+      const encodedPath = key.split("/").map(encodeURIComponent).join("/");
+      const githubUrl = "https://api.github.com/repos/prem-pk-dev/PHOTOGRAPHY-MEDIA/contents/" + encodedPath;
+      const headers = {
+        "accept": "application/vnd.github+json",
+        "user-agent": "Photography-Media-Uploader/1.0",
+        "authorization": "Bearer " + env.MEDIA_GITHUB_TOKEN,
+        "x-github-api-version": "2022-11-28",
+      };
+      const lookup = await fetch(githubUrl, { method: "GET", headers });
+      if (lookup.status !== 404) {
+        if (!lookup.ok) return json({ error: "media_repository_lookup_failed", githubStatus: lookup.status }, 503);
+        const remote = await lookup.json() as { sha?: string };
+        if (!remote.sha) return json({ error: "media_repository_response_invalid" }, 503);
+        const removal = await fetch(githubUrl, {
+          method: "DELETE",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ message: "Permanently delete portfolio media " + id, sha: remote.sha, branch: "main" }),
+        });
+        if (!removal.ok && removal.status !== 404) {
+          return json({ error: "media_repository_delete_failed", githubStatus: removal.status }, 503);
+        }
+      }
+      // A retry after GitHub deletion but before D1 cleanup sees 404 and safely
+      // completes metadata cleanup. The path is bound to this exact project/media ID.
+      const results = await env.DB.batch([
+        env.DB.prepare(
+          "DELETE FROM project_media WHERE id = ? AND NOT EXISTS (" +
+          "SELECT 1 FROM projects WHERE id = ? AND cover_image_url = ?)"
+        ).bind(id, current.project_id, current.preview_url),
+        env.DB.prepare(
+          "INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) " +
+          "SELECT ?, ?, 'media_permanently_deleted', 'media', ? WHERE changes() = 1"
+        ).bind(crypto.randomUUID(), admin.id, id),
+      ]);
+      if ((results[0]?.meta?.changes ?? 0) !== 1) {
+        return json({ error: "replace_cover_before_deleting" }, 409);
+      }
+      return json({ ok: true, id, deletedFromRepository: true });
+    } catch {
+      return json({ error: "media_delete_unavailable" }, 503);
+    }
+  }
+
+  if (url.pathname === "/api/admin/projects/media/alt-text" && request.method === "POST") {
+    if (!env.DB) return json({ error: "database_not_configured" }, 503);
+    const admin = await currentAdmin(request, env);
+    if (!admin) return json({ error: "unauthorized" }, 401);
+    const body = await readAdminJson(request, 4096);
+    const id = cleanText(body?.id, 80);
+    const altEn = cleanText(body?.altEn, 250);
+    const altHi = cleanText(body?.altHi, 250);
+    if (!id) return json({ error: "validation_failed" }, 400);
+    try {
+      const current = await env.DB.prepare("SELECT id FROM project_media WHERE id = ?").bind(id).first<{ id: string }>();
+      if (!current) return json({ error: "media_not_found" }, 404);
+      const results = await env.DB.batch([
+        env.DB.prepare("UPDATE project_media SET alt_en = ?, alt_hi = ? WHERE id = ?").bind(altEn, altHi, id),
+        env.DB.prepare("INSERT INTO audit_logs (id, admin_user_id, action, target_type, target_id) VALUES (?, ?, 'media_alt_text_updated', 'media', ?)").bind(crypto.randomUUID(), admin.id, id),
+      ]);
+      if ((results[0]?.meta?.changes ?? 0) !== 1) return json({ error: "media_not_found" }, 404);
+      return json({ ok: true, id });
+    } catch {
+      return json({ error: "media_alt_text_update_unavailable" }, 503);
     }
   }
 
@@ -1542,7 +1789,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         enquirySchemaReady,
         portfolioSchemaReady,
         contentTablesReady,
-        mediaStorageConfigured: Boolean(env.MEDIA_BUCKET),
+        mediaStorageConfigured: Boolean(env.MEDIA_GITHUB_TOKEN),
         blockers: [
           ...(!env.ADMIN_SETUP_SECRET ? ["ADMIN_SETUP_SECRET is not configured"] : []),
           ...(!adminRoleSchemaReady ? ["Owner/editor role migration is pending"] : []),
@@ -1550,7 +1797,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
           ...(!portfolioSchemaReady ? ["Portfolio schema is incompatible"] : []),
           ...(!contentTablesReady ? ["CMS content tables are missing"] : []),
           ...(!bookingTablesReady ? ["Customer booking schema migration is pending"] : []),
-          ...(!env.MEDIA_BUCKET ? ["R2 media bucket binding is not configured"] : []),
+          ...(!env.MEDIA_GITHUB_TOKEN ? ["MEDIA_GITHUB_TOKEN is not configured"] : []),
         ],
       });
     } catch {
