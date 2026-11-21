@@ -8,6 +8,8 @@
  * This script sends GET requests only. It never creates an admin, submits an
  * enquiry, changes content, or performs any database write.
  */
+import { validateReadiness } from "./pages-api-smoke-contract.mjs";
+
 const rawBaseUrl = process.argv[2] ?? process.env.PAGES_BASE_URL;
 if (!rawBaseUrl) {
   console.error("Usage: node scripts/smoke-pages-api.mjs <https-pages-deployment-url>");
@@ -46,11 +48,9 @@ const checks = [
     path: "/api/ready",
     validate: async (response) => {
       const body = await response.json();
-      if (!body || typeof body !== "object" || Array.isArray(body)) {
-        throw new Error("expected a JSON object");
-      }
-      if (body.status !== "ready" || body.schema !== "legacy-compatible") {
-        throw new Error(`expected a ready legacy-compatible schema, got ${JSON.stringify(body)}`);
+      const warnings = validateReadiness(body);
+      for (const warning of warnings) {
+        console.warn(`WARN optional capability is disabled: ${warning}`);
       }
     },
   },
