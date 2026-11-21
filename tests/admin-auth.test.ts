@@ -129,6 +129,21 @@ test("admin session endpoint never authenticates without a valid server-side ses
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
+test("admin session returns the verified admin for a valid session cookie", async () => {
+  const db = mockDbWithAuthenticatedSession();
+  const response = await worker.fetch(new Request("https://example.test/api/admin/session", {
+    headers: { cookie: "__Host-gf_admin=sample-session-token" }
+  }), { DB: db });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    authenticated: true,
+    admin: { id: "admin-1", email: "owner@example.test", role: "owner" }
+  });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.ok(db.queries.some(query => query.includes("JOIN admin_users u ON u.id = s.admin_user_id")));
+});
+
 test("admin login does not accept GET requests", async () => {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login"), { DB: mockDb() });
   assert.equal(response.status, 405);
