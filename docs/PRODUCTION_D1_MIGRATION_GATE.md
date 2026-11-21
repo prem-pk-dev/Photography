@@ -1,6 +1,6 @@
 # Production D1 Migration Gate — Golden Films
 
-<badge>BLOCKED: Production D1 writes and migrations</badge>
+**Status: BLOCKED — Production D1 writes and migrations are not authorized.**
 
 Last read-only audit: **2026-11-21**. This document distinguishes current live-schema evidence from migration-history and backup evidence that is still missing.
 
