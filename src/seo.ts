@@ -47,7 +47,7 @@ export function getSeoMetadata(pathname: string, language: SiteLanguage = "en"):
     language === "hi" ? "माँगा गया पेज उपलब्ध नहीं है।" : "The requested page could not be found."
   ];
   const isPrivate = privateRoutes.has(path) || !known;
-  return { title, description, canonical: ORIGIN + (known ? path : "/"), language, robots: isPrivate ? "noindex,nofollow" : "index,follow" };
+  return { title, description, canonical: ORIGIN + path, language, robots: isPrivate ? "noindex,nofollow" : "index,follow" };
 }
 
 function setMeta(attribute: "name" | "property", key: string, value: string): void {
