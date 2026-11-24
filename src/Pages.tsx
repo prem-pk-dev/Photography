@@ -1446,6 +1446,14 @@ function PortfolioPageContent() {
           </div>
         </article>;
       })}</div>
+      <section className="page-section">
+        <h2>{language === "hi" ? "वेडिंग प्रेरणा — नमूना गैलरी" : "Wedding inspiration — sample gallery"}</h2>
+        <p className="section-subtitle">{language === "hi" ? "ये डेमो तस्वीरें हैं, सत्यापित क्लाइंट प्रोजेक्ट नहीं।" : "These are demo visuals, not verified client projects."}</p>
+        <div className="featured-grid">{projects.filter(p => p.category.en === "Wedding Photography" && p.id !== "jaipur-wedding-2026").map(p => <article className="project-card" key={p.id}>
+          <div className="project-image"><img src={p.image} alt={p.imageAlt[language]} loading="lazy" /><span className="demo-tag">{language === "hi" ? "डेमो" : "DEMO"}</span></div>
+          <div className="project-card-copy"><h3>{p.title[language]}</h3><p>{p.category[language]}</p></div>
+        </article>)}</div>
+      </section>
     </> : <><h2 style={{ marginTop: 48 }}>{language === "hi" ? "विशेष प्रोजेक्ट" : "Featured projects"}</h2><div className="featured-grid">{projects.filter(p => p.featured).map(p=><article className="project-card" key={p.id}><div className="project-image"><img src={p.image} alt={p.imageAlt[language]} loading="lazy" /><span className="demo-tag">{language === "hi" ? "डेमो" : "DEMO"}</span></div><div className="project-card-copy"><h3>{p.title[language]}</h3><p>{p.category[language]}</p></div></article>)}</div></>}
   </SiteFrame>;
 }
