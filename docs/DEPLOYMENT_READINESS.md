@@ -65,3 +65,11 @@ The read-only verifier at `scripts/verify-d1-migration.sql` is a checklist of qu
 - The Worker applies baseline security headers in its shared response wrapper. PR #112 added regression tests for API 404, static-asset fallback 503, and HTTPS-only HSTS behavior.
 - PR #112 is merged and deployed. Exact-head CI, post-merge CI, Preview and Production deployment all passed. No live browser-level header observation was available from the current environment.
 - These changes did not modify D1, secrets, bindings, customer/admin records, or paid resources.
+
+
+## Static route SEO entrypoints (2026-11-24)
+
+- The production build now generates route-specific HTML entrypoints for `/`, `/portfolio`, `/services`, `/about`, `/showreel`, `/contact`, plus `/book`, `/admin`, `/login`, and `/register`.
+- Public routes receive their own title, description, canonical URL, Open Graph metadata, Twitter card, document language, and `index,follow` robots directive. Private routes receive `noindex,nofollow`.
+- The SPA still hydrates normally from the generated entrypoints. Static metadata defaults to English; the existing client-side language state can update metadata to Hindi after hydration. This is metadata pre-rendering, not full React SSR or pre-rendered page body content.
+- The generator reuses `getSeoMetadata` from `src/seo.ts` as the single metadata source and is covered by isolated filesystem tests.
