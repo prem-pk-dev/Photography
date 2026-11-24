@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Aperture, ArrowLeft, ArrowRight, Camera, Clapperboard, Film, Image, LockKeyhole, ShieldCheck, WandSparkles, LogOut, LayoutDashboard } from "lucide-react";
+import { Aperture, ArrowLeft, ArrowRight, Camera, Clapperboard, Film, Image, LockKeyhole, ShieldCheck, WandSparkles, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 import { categories, projects } from "./data";
 
 const nav = [
@@ -13,6 +13,7 @@ function getSiteLanguage(): "en" | "hi" {
 
 function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   const language = getSiteLanguage();
+  const [menuOpen, setMenuOpen] = useState(false);
   const params = new URLSearchParams(window.location.search);
   const nextParams = new URLSearchParams(params);
   nextParams.set("lang", language === "en" ? "hi" : "en");
@@ -32,7 +33,19 @@ function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: strin
         <span className="brand-mark"><Aperture size={28} strokeWidth={1.6} /></span>
         <span className="brand-copy"><strong>GOLDEN <em>FILMS</em></strong><small>PHOTOGRAPHY · FILMS · EDITING</small></span>
       </a>
-      <nav className="main-nav" aria-label="Main navigation">{nav.map(([label, href]) => <a key={href} href={href + (language === "hi" ? "?lang=hi" : "")}>{labels[label] || label}</a>)}</nav>
+      <button
+        className="mobile-menu-toggle"
+        type="button"
+        aria-label={menuOpen ? (language === "hi" ? "मेन्यू बंद करें" : "Close navigation") : (language === "hi" ? "मेन्यू खोलें" : "Open navigation")}
+        aria-expanded={menuOpen}
+        aria-controls="site-navigation"
+        onClick={() => setMenuOpen(open => !open)}
+      >
+        {menuOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+      <nav id="site-navigation" className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
+        {nav.map(([label, href]) => <a key={href} href={href + (language === "hi" ? "?lang=hi" : "")} onClick={() => setMenuOpen(false)}>{labels[label] || label}</a>)}
+      </nav>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <a className="button button-outline" href={languageHref} lang={language === "en" ? "hi" : "en"} aria-label={language === "en" ? "हिंदी में देखें" : "View in English"}>{language === "en" ? "हिंदी" : "English"}</a>
         <a className="button button-gold header-cta" href={"/contact" + (language === "hi" ? "?lang=hi" : "")}>{language === "hi" ? "संपर्क करें" : "Contact"} <ArrowRight size={15} /></a>
