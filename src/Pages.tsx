@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Aperture, ArrowLeft, ArrowRight, Camera, Clapperboard, Film, Image, LockKeyhole, ShieldCheck, WandSparkles, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 import { categories, projects } from "./data";
+import { applySeoMetadata } from "./seo";
 
 const nav = [
   ["Home", "/"], ["Portfolio", "/portfolio"], ["Services", "/services"],
@@ -1429,6 +1430,8 @@ function PortfolioPageContent() {
 
 export default function Pages() {
   const path = window.location.pathname.replace(/\/$/, "") || "/";
+  const language = getSiteLanguage();
+  useEffect(() => { applySeoMetadata(path, language); }, [path, language]);
   if (path === "/book") return <CustomerBookingPage />;
   if (path === "/portfolio") return <PortfolioPageContent />;
   if (path === "/services") return <ServicesContentPage />;
