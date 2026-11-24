@@ -69,5 +69,8 @@ test("showreel uses the four rights-verified MEDIA-ASSETS photography videos", (
   }
   assert.match(showreel, /Four cinematic video clips/);
   assert.match(showreel, /AI-generated samples, not evidence of client shoots/);
+  assert.match(showreel, /ये AI-generated नमूना क्लिप केवल प्रेरणा के लिए हैं/);
+  assert.match(showreel, /An approved client showreel will be featured separately when available/);
+  assert.doesNotMatch(showreel, /शो-रील खाली रहेगी|showreel slot remains empty/);
   assert.doesNotMatch(showreel, /videos\.pexels\.com/);
 });
