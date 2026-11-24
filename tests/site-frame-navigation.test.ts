@@ -20,3 +20,8 @@ test("secondary page navigation closes after a route is selected", () => {
 test("Hindi mobile navigation localizes the booking route label", () => {
   assert.match(siteFrame, /"Book a slot": "स्लॉट बुक करें"/);
 });
+
+
+test("navigation landmark label follows the selected language", () => {
+  assert.match(siteFrame, /aria-label={language === "hi" \? "मुख्य नेविगेशन" : "Main navigation"}/);
+});
