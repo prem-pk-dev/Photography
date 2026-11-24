@@ -21,11 +21,11 @@ function upsertMeta(html, attribute, key, value) {
 
 export function renderSeoHtml(template, pathname, language = "en") {
   const metadata = getSeoMetadata(pathname, language);
-  let html = template.replace(/<html\\b([^>]*)>/i, (_tag, attributes) => {
-    const withoutLanguage = attributes.replace(/\\s+lang=("[^"]*"|'[^']*')/i, "");
+  let html = template.replace(/<html\b([^>]*)>/i, (_tag, attributes) => {
+    const withoutLanguage = attributes.replace(/\s+lang=("[^"]*"|'[^']*')/i, "");
     return '<html' + withoutLanguage + ' lang="' + escapeAttribute(metadata.language) + '">';
   });
-  html = html.replace(/<title>[^<]*<\\/title>/i, "<title>" + escapeAttribute(metadata.title) + "</title>");
+  html = html.replace(/<title>[^<]*<\/title>/i, "<title>" + escapeAttribute(metadata.title) + "</title>");
   html = upsertMeta(html, "name", "description", metadata.description);
   html = upsertMeta(html, "name", "robots", metadata.robots);
   html = upsertMeta(html, "property", "og:title", metadata.title);
@@ -36,7 +36,7 @@ export function renderSeoHtml(template, pathname, language = "en") {
   html = upsertMeta(html, "name", "twitter:card", "summary_large_image");
 
   const canonical = '<link rel="canonical" href="' + escapeAttribute(metadata.canonical) + '" />';
-  const canonicalMatcher = /<link\\s+rel=["']canonical["'][^>]*>/i;
+  const canonicalMatcher = /<link\s+rel=["']canonical["'][^>]*>/i;
   html = canonicalMatcher.test(html)
     ? html.replace(canonicalMatcher, canonical)
     : html.replace("</head>", "    " + canonical + "\n  </head>");
