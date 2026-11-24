@@ -5,6 +5,7 @@ import {
   WandSparkles, X
 } from "lucide-react";
 import { categories, heroImage, projects, type Language, type PortfolioGroup } from "./data";
+import { applySeoMetadata } from "./seo";
 
 const copy = {
   en: {
@@ -136,6 +137,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [siteContent, setSiteContent] = useState<Record<string, string>>({});
   const isDraftPreview = new URLSearchParams(window.location.search).get("preview") === "1";
+  useEffect(() => { applySeoMetadata("/", language); }, [language]);
   useEffect(() => {
     let active = true;
     const endpoint = isDraftPreview ? "/api/admin/content/preview?page=home" : "/api/content?page=home";
