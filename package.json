@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run typecheck && vite build",
+    "build": "npm run typecheck && vite build && node --experimental-strip-types scripts/prerender-seo.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false && tsc -p tsconfig.worker.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
