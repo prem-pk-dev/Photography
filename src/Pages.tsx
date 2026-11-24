@@ -44,7 +44,7 @@ function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: strin
       >
         {menuOpen ? <X size={22} /> : <Menu size={22} />}
       </button>
-      <nav id="site-navigation" className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
+      <nav id="site-navigation" className={`main-nav ${menuOpen ? "is-open" : ""}`} aria-label={language === "hi" ? "मुख्य नेविगेशन" : "Main navigation"}>
         {nav.map(([label, href]) => <a key={href} href={href + (language === "hi" ? "?lang=hi" : "")} onClick={() => setMenuOpen(false)}>{labels[label] || label}</a>)}
       </nav>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
