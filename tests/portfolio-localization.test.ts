@@ -38,3 +38,36 @@ test("wedding demo gallery uses registered public media and remains clearly labe
   assert.match(portfolio, /"डेमो" : "DEMO"/);
   assert.match(data, /sample demo image/);
 });
+
+
+test("owner contact details are actionable and consistent across contact channels", () => {
+  const contact = pages.slice(pages.indexOf("function ContactContentPage"), pages.indexOf("export default function Pages"));
+  assert.match(contact, /href="tel:\+918949800427"/);
+  assert.match(contact, /href="https:\/\/wa\.me\/918949800427"/);
+  assert.match(contact, /href="mailto:prem92006@gmail\.com"/);
+  assert.match(contact, /https:\/\/wa\.me\/918949800427\?text=/);
+  assert.doesNotMatch(contact, /details are temporary|ये विवरण अस्थायी हैं/);
+});
+
+test("about fallback is a factual bilingual Golden Films studio biography", () => {
+  const about = pages.slice(pages.indexOf("function AboutContentPage"), pages.indexOf("function ServicesContentPage"));
+  assert.match(about, /Golden Films is a visual storytelling studio/);
+  assert.match(about, /Golden Films एक विज़ुअल स्टोरीटेलिंग स्टूडियो है/);
+  assert.match(about, /not verified client work/);
+});
+
+test("showreel uses the four rights-verified MEDIA-ASSETS photography videos", () => {
+  const showreel = pages.slice(pages.indexOf("function ShowreelContentPage"), pages.indexOf("function ContactContentPage"));
+  const videos = [
+    "photography-cinematic-showcase.mp4",
+    "photography-visual-story.mp4",
+    "photography-gemini-motion-01.mp4",
+    "photography-gemini-motion-02.mp4"
+  ];
+  for (const video of videos) {
+    assert.ok(showreel.includes("https://media-assets-4sb.pages.dev/videos/photography/" + video), "missing registered video: " + video);
+  }
+  assert.match(showreel, /Four cinematic video clips/);
+  assert.match(showreel, /AI-generated samples, not evidence of client shoots/);
+  assert.doesNotMatch(showreel, /videos\.pexels\.com/);
+});
