@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Private admin interfaces must not be indexed.
+Disallow: /admin
+Disallow: /admin.html
+Disallow: /login
+Disallow: /login.html
+Disallow: /register
+Disallow: /register.html
+Disallow: /api/admin/
+
+Sitemap: https://golden-films.pages.dev/sitemap.xml
