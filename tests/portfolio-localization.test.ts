@@ -20,3 +20,19 @@ test("published portfolio content uses Hindi fields and localized media actions"
   assert.match(portfolio, /"वीडियो देखें" : "Watch video"/);
   assert.match(portfolio, /"सभी प्रोजेक्ट" : "All projects"/);
 });
+
+test("wedding demo gallery uses registered public media and remains clearly labelled as demo", () => {
+  const data = readFileSync("src/data.ts", "utf8");
+  const weddingAssets = [
+    "wedding-garden-portrait.webp",
+    "wedding-chapel-ceremony.webp",
+    "wedding-reception-laughter.webp",
+    "wedding-rings-bouquet.webp",
+    "wedding-sunset-kiss.webp"
+  ];
+  for (const asset of weddingAssets) {
+    assert.ok(data.includes(`https://media-assets-4sb.pages.dev/images/photography/wedding/${asset}`), `missing registered wedding asset: ${asset}`);
+  }
+  assert.match(portfolio, /"डेमो" : "DEMO"/);
+  assert.match(data, /sample demo image/);
+});
