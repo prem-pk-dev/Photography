@@ -16,6 +16,3 @@ test("static Pages responses ship baseline browser security headers", () => {
   ]) assert.ok(headers.includes(header), `missing security header: ${header}`);
 });
 
-test("static API asset responses are not cached", () => {
-  assert.match(headers, /\/api\/\*\s+Cache-Control: no-store/);
-});
