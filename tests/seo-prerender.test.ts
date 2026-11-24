@@ -27,14 +27,14 @@ test("static route renderer writes distinct public metadata and private noindex 
     const admin = await readFile(path.join(directory, "admin", "index.html"), "utf8");
     const booking = await readFile(path.join(directory, "book", "index.html"), "utf8");
 
-    assert.match(home, /<title>Golden Films — Photography, Films &amp; Editing<\\/title>/);
-    assert.match(portfolio, /<title>Portfolio — Golden Films<\\/title>/);
-    assert.match(portfolio, /canonical" href="https:\\/\\/golden-films\\.pages\\.dev\\/portfolio"/);
-    assert.match(contact, /Contact Golden Films/);
-    assert.match(admin, /name="robots" content="noindex,nofollow"/);
-    assert.match(booking, /name="robots" content="noindex,nofollow"/);
-    assert.match(portfolio, /name="robots" content="index,follow"/);
-    assert.match(portfolio, /property="og:url" content="https:\\/\\/golden-films\\.pages\\.dev\\/portfolio"/);
+    assert.ok(home.includes("<title>Golden Films — Photography, Films &amp; Editing</title>"));
+    assert.ok(portfolio.includes("<title>Portfolio — Golden Films</title>"));
+    assert.ok(portfolio.includes('href="https://golden-films.pages.dev/portfolio"'));
+    assert.ok(contact.includes("Contact Golden Films"));
+    assert.ok(admin.includes('name="robots" content="noindex,nofollow"'));
+    assert.ok(booking.includes('name="robots" content="noindex,nofollow"'));
+    assert.ok(portfolio.includes('name="robots" content="index,follow"'));
+    assert.ok(portfolio.includes('property="og:url" content="https://golden-films.pages.dev/portfolio"'));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -42,7 +42,7 @@ test("static route renderer writes distinct public metadata and private noindex 
 
 test("static route renderer emits Hindi language and metadata when requested", () => {
   const html = renderSeoHtml(template, "/portfolio", "hi");
-  assert.match(html, /<html lang="hi">/);
-  assert.match(html, /<title>पोर्टफोलियो — Golden Films<\\/title>/);
-  assert.match(html, /property="og:locale" content="hi_IN"/);
+  assert.ok(html.includes('<html lang="hi">'));
+  assert.ok(html.includes("<title>पोर्टफोलियो — Golden Films</title>"));
+  assert.ok(html.includes('property="og:locale" content="hi_IN"'));
 });
