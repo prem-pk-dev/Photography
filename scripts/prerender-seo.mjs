@@ -13,11 +13,10 @@ function escapeAttribute(value) {
 }
 
 function upsertMeta(html, attribute, key, value) {
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const matcher = new RegExp("<meta\\s+" + attribute + "=[\\"']" + escapedKey + "[\\"'][^>]*>", "i");
+  const matcher = new RegExp("<meta\\s+" + attribute + "=[\\"']" + key + "[\\"'][^>]*>", "i");
   const tag = '<meta ' + attribute + '="' + key + '" content="' + escapeAttribute(value) + '" />';
   if (matcher.test(html)) return html.replace(matcher, tag);
-  return html.replace("</head>", "    " + tag + "\\n  </head>");
+  return html.replace("</head>", "    " + tag + "\n  </head>");
 }
 
 export function renderSeoHtml(template, pathname, language = "en") {
@@ -40,7 +39,7 @@ export function renderSeoHtml(template, pathname, language = "en") {
   const canonicalMatcher = /<link\\s+rel=["']canonical["'][^>]*>/i;
   html = canonicalMatcher.test(html)
     ? html.replace(canonicalMatcher, canonical)
-    : html.replace("</head>", "    " + canonical + "\\n  </head>");
+    : html.replace("</head>", "    " + canonical + "\n  </head>");
   return html;
 }
 
