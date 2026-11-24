@@ -15,3 +15,8 @@ test("secondary pages expose an accessible mobile navigation toggle", () => {
 test("secondary page navigation closes after a route is selected", () => {
   assert.ok(siteFrame.includes("onClick={() => setMenuOpen(false)}"));
 });
+
+
+test("Hindi mobile navigation localizes the booking route label", () => {
+  assert.match(siteFrame, /"Book a slot": "स्लॉट बुक करें"/);
+});
