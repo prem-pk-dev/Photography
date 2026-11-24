@@ -13,7 +13,7 @@ Last checked: 2026-11-24 (IST)
 - `GET /api/health` was verified: HTTP 200 with `{"status":"ok","service":"golden-films-api"}`.
 - Last recorded live API smoke (2026-11-18): `GET /api/health` and `GET /api/ready` both returned HTTP 200. Readiness was `ready`, while `capabilities.customerBooking` was `false` and `disabledFeatures` included `customer_booking`.
 - No fresh live HTTP probe was performed during the 2026-11-24 code releases; treat the 2026-11-18 response as the latest recorded runtime evidence, not a current-day probe.
-- Current `main` merge: `98ec96a41512f1e8cb30c250d384f1086c2ca430`. Exact-commit Production Pages deployment succeeded: https://ba00c3ca.golden-films.pages.dev (deployment `ba00c3ca-6e13-43ec-a7c3-26bb36bebd87`). Pages Functions are active.
+- Latest verified `main` commit: `b97941c4bda5b884837f52a4a643361bb5d61d06` (PR #114, static route SEO entrypoints). Exact-commit Production Pages deployment succeeded: https://8845dcfc.golden-films.pages.dev (deployment `8845dcfc-275d-497f-8edb-b6ed8a2ab9e7`; deploy stage success at 2026-11-24 03:31:09 UTC). Pages Functions are active.
 - Contact details currently shown are temporary: phone/WhatsApp `+91 89498 00427`, email `prem92006@gmail.com`.
 - Portfolio and showreel visuals are explicitly demo/sample material; real client work, approved biography and real film links are still required before presenting them as a completed client portfolio.
 
