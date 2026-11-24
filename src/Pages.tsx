@@ -20,7 +20,7 @@ function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: strin
   nextParams.set("lang", language === "en" ? "hi" : "en");
   const languageHref = window.location.pathname + "?" + nextParams.toString();
   const labels: Record<string, string> = language === "hi"
-    ? { Home: "होम", Portfolio: "पोर्टफोलियो", Services: "सेवाएँ", About: "परिचय", Showreel: "शो-रील", Contact: "संपर्क" }
+    ? { Home: "होम", Portfolio: "पोर्टफोलियो", Services: "सेवाएँ", About: "परिचय", Showreel: "शो-रील", Contact: "संपर्क", "Book a slot": "स्लॉट बुक करें" }
     : {};
   const translatedEyebrow = language === "hi" ? ({
     "THE CREATIVE BEHIND THE LENS": "कैमरे के पीछे की रचनात्मकता",
