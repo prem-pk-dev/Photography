@@ -51,7 +51,7 @@ All placeholder/demo media must be clearly labelled as sample content and must n
 
 ## Current limitations and verification gates
 
-- Real phone, WhatsApp, email and Instagram details have not been provided.
+- Owner-provided phone, WhatsApp and email contact details are published on the Contact page; an Instagram handle has not been supplied.
 - The Preview Pages API read-only smoke workflow has passed according to the owner. The script checks `GET /api/health`, `GET /api/ready`, and `GET /api/content?page=home`; it refuses non-HTTPS URLs and redirects.
 - Live authenticated browser/API E2E remains unverified: owner setup, login/session/logout, rate limiting/audit events, CMS revisions/publish, and owner/editor permission boundaries still need isolated Preview verification.
 - Non-destructive GitHub-backed media upload/read/alt-text verification against a disposable Preview project remains pending. Do not modify existing portfolio media during testing.
