@@ -1,6 +1,6 @@
 # Cloudflare Deployment Readiness
 
-Last checked: 2026-11-17 (IST)
+Last checked: 2026-11-24 (IST)
 
 ## Verified production state
 
@@ -55,3 +55,11 @@ The read-only verifier at `scripts/verify-d1-migration.sql` is a checklist of qu
 - Keep the workflow within the existing ₹0 budget; use free-tier resources only.
 - Never commit API tokens, database credentials, or secrets to the repository.
 - Do not add paid services or create billable resources without explicit approval.
+
+
+## Static response security headers (2026-11-24)
+
+- Added Cloudflare Pages `public/_headers` baseline for static responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, a restrictive `Permissions-Policy` for camera/microphone/geolocation, and one-year HSTS.
+- Added a Node regression test to ensure the deployed header configuration retains these directives.
+- Scope is static asset/HTML responses served by Pages. Pages Functions/API responses are governed separately by Worker response headers; this file does not prove those responses have these headers.
+- Preview and Production response-header verification is still required after deployment. This change does not alter D1, Worker logic, secrets, bindings, accounts, or paid resources.
