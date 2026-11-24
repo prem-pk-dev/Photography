@@ -13,7 +13,7 @@ function escapeAttribute(value) {
 }
 
 function upsertMeta(html, attribute, key, value) {
-  const matcher = new RegExp("<meta\\s+" + attribute + "=[\"']" + key + "[\\"'][^>]*>", "i");
+  const matcher = new RegExp("<meta\\s+" + attribute + "=[\"']" + key + "[\"'][^>]*>", "i");
   const tag = '<meta ' + attribute + '="' + key + '" content="' + escapeAttribute(value) + '" />';
   if (matcher.test(html)) return html.replace(matcher, tag);
   return html.replace("</head>", "    " + tag + "\n  </head>");
