@@ -19,6 +19,8 @@ test("published portfolio content uses Hindi fields and localized media actions"
   assert.match(portfolio, /item\.alt_hi/);
   assert.match(portfolio, /"वीडियो देखें" : "Watch video"/);
   assert.match(portfolio, /"सभी प्रोजेक्ट" : "All projects"/);
+  assert.match(portfolio, /"वेडिंग प्रेरणा — नमूना गैलरी" : "Wedding inspiration — sample gallery"/);
+  assert.match(portfolio, /projects\.filter\(p => p\.category\.en === "Wedding Photography"/);
 });
 
 test("wedding demo gallery uses registered public media and remains clearly labelled as demo", () => {
