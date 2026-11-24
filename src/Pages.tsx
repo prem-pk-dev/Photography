@@ -26,7 +26,8 @@ function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: strin
     "THE CREATIVE BEHIND THE LENS": "कैमरे के पीछे की रचनात्मकता",
     "WHAT WE CREATE": "हम क्या बनाते हैं",
     "A MOVING PICTURE": "चलती तस्वीरों की कहानी",
-    "LET'S MAKE SOMETHING MEANINGFUL": "आइए कुछ यादगार बनाएँ"
+    "LET'S MAKE SOMETHING MEANINGFUL": "आइए कुछ यादगार बनाएँ",
+    "SELECTED STORIES": "चुनी हुई कहानियाँ"
   } as Record<string, string>)[eyebrow] || eyebrow : eyebrow;
   return <div className="site-shell">
     <header className="site-header">
@@ -1388,9 +1389,13 @@ type PublicProject = {
 type PublicProjectMedia = { id: string; project_id: string; media_type: string; preview_url: string; alt_en: string; alt_hi: string; sort_order: number };
 
 function PortfolioPageContent() {
+  const language = getSiteLanguage();
   const [liveProjects, setLiveProjects] = useState<PublicProject[]>([]);
   const [liveMedia, setLiveMedia] = useState<PublicProjectMedia[]>([]);
   const [filter, setFilter] = useState("all");
+  const groupLabels: Record<string, string> = language === "hi"
+    ? { photography: "फोटोग्राफी", videography: "वीडियोग्राफी", editing: "एडिटिंग" }
+    : { photography: "Photography", videography: "Videography", editing: "Editing" };
   useEffect(() => {
     let active = true;
     fetch("/api/projects?limit=48", { cache: "no-store" })
@@ -1404,27 +1409,35 @@ function PortfolioPageContent() {
     return () => { active = false; };
   }, []);
   const visibleProjects = filter === "all" ? liveProjects : liveProjects.filter(project => project.category_slug === filter);
-  return <SiteFrame eyebrow="SELECTED STORIES" title="Portfolio">
-    <p className="section-subtitle">Browse portfolio categories and published projects. Sample cards remain labelled demo content until replaced by approved work.</p>
+  const categoryTitle = (slug: string) => {
+    const category = categories.find(item => item.id === slug || item.id === slug.replace(/-/g, ""));
+    return category ? category.title[language] : slug.replaceAll("-", " ");
+  };
+  return <SiteFrame eyebrow="SELECTED STORIES" title={language === "hi" ? "पोर्टफोलियो" : "Portfolio"}>
+    <p className="section-subtitle">{language === "hi" ? "पोर्टफोलियो की कैटेगरी और प्रकाशित प्रोजेक्ट देखें। स्वीकृत वास्तविक काम से बदले जाने तक नमूना कार्ड को डेमो के रूप में चिह्नित रखा गया है।" : "Browse portfolio categories and published projects. Sample cards remain labelled demo content until replaced by approved work."}</p>
     <div className="category-grid">{categories.map(item => <article className="category-card" key={item.id}>
-      <a className="category-image" href="/contact"><img src={item.image} alt={item.imageAlt.en} loading="lazy" /><span className="demo-tag">DEMO</span></a>
-      <div className="category-card-copy"><h3>{item.title.en}</h3><p>{item.group}</p></div>
+      <a className="category-image" href={language === "hi" ? "/contact?lang=hi" : "/contact"}><img src={item.image} alt={item.imageAlt[language]} loading="lazy" /><span className="demo-tag">{language === "hi" ? "डेमो" : "DEMO"}</span></a>
+      <div className="category-card-copy"><h3>{item.title[language]}</h3><p>{groupLabels[item.group]}</p></div>
     </article>)}</div>
     {liveProjects.length > 0 ? <>
-      <h2 style={{ marginTop: 48 }}>Published projects</h2>
+      <h2 style={{ marginTop: 48 }}>{language === "hi" ? "प्रकाशित प्रोजेक्ट" : "Published projects"}</h2>
       <div className="filter-row" style={{ marginTop: 16 }}>
-        <button type="button" className={"filter-chip" + (filter === "all" ? " active" : "")} onClick={() => setFilter("all")}>All projects</button>
-        {Array.from(new Set(liveProjects.map(project => project.category_slug))).map(slug => <button key={slug} type="button" className={"filter-chip" + (filter === slug ? " active" : "")} onClick={() => setFilter(slug)}>{categories.find(category => category.id === slug || category.id === slug.replace(/-/g, ""))?.title.en || slug.replaceAll("-", " ")}</button>)}
+        <button type="button" className={"filter-chip" + (filter === "all" ? " active" : "")} onClick={() => setFilter("all")}>{language === "hi" ? "सभी प्रोजेक्ट" : "All projects"}</button>
+        {Array.from(new Set(liveProjects.map(project => project.category_slug))).map(slug => <button key={slug} type="button" className={"filter-chip" + (filter === slug ? " active" : "")} onClick={() => setFilter(slug)}>{categoryTitle(slug)}</button>)}
       </div>
-      <div className="featured-grid">{visibleProjects.map(project => <article className="project-card" key={project.id}>
-        <div className="project-image"><img src={project.cover_image_url} alt={project.title_en || project.slug} loading="lazy" /></div>
-        <div className="project-card-copy"><h3>{project.title_en || project.slug}</h3><p>{project.category_slug.replaceAll("-", " ")}{project.location ? " · " + project.location : ""}</p>{project.description_en && <p className="section-subtitle">{project.description_en}</p>}
-          {liveMedia.filter(item => item.project_id === project.id).map(item => item.media_type === "image"
-            ? <a key={item.id} className="category-image" href={item.preview_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 10 }}><img src={item.preview_url} alt={item.alt_en || project.title_en || project.slug} loading="lazy" /></a>
-            : <p key={item.id} style={{ marginTop: 10 }}><a className="text-link" href={item.preview_url} target="_blank" rel="noopener noreferrer">Watch video <ArrowRight size={15}/></a></p>)}
-        </div>
-      </article>)}</div>
-    </> : <><h2 style={{ marginTop: 48 }}>Featured projects</h2><div className="featured-grid">{projects.filter(p => p.featured).map(p => <article className="project-card" key={p.id}><div className="project-image"><img src={p.image} alt={p.imageAlt.en} loading="lazy" /><span className="demo-tag">DEMO</span></div><div className="project-card-copy"><h3>{p.title.en}</h3><p>{p.category.en}</p></div></article>)}</div></>}
+      <div className="featured-grid">{visibleProjects.map(project => {
+        const title = (language === "hi" ? project.title_hi : project.title_en) || project.title_en || project.slug;
+        const description = language === "hi" ? project.description_hi : project.description_en;
+        return <article className="project-card" key={project.id}>
+          <div className="project-image"><img src={project.cover_image_url} alt={title} loading="lazy" /></div>
+          <div className="project-card-copy"><h3>{title}</h3><p>{categoryTitle(project.category_slug)}{project.location ? " · " + project.location : ""}</p>{description && <p className="section-subtitle">{description}</p>}
+            {liveMedia.filter(item => item.project_id === project.id).map(item => item.media_type === "image"
+              ? <a key={item.id} className="category-image" href={item.preview_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 10 }}><img src={item.preview_url} alt={(language === "hi" ? item.alt_hi : item.alt_en) || item.alt_en || title} loading="lazy" /></a>
+              : <p key={item.id} style={{ marginTop: 10 }}><a className="text-link" href={item.preview_url} target="_blank" rel="noopener noreferrer">{language === "hi" ? "वीडियो देखें" : "Watch video"} <ArrowRight size={15}/></a></p>)}
+          </div>
+        </article>;
+      })}</div>
+    </> : <><h2 style={{ marginTop: 48 }}>{language === "hi" ? "विशेष प्रोजेक्ट" : "Featured projects"}</h2><div className="featured-grid">{projects.filter(p => p.featured).map(p=><article className="project-card" key={p.id}><div className="project-image"><img src={p.image} alt={p.imageAlt[language]} loading="lazy" /><span className="demo-tag">{language === "hi" ? "डेमो" : "DEMO"}</span></div><div className="project-card-copy"><h3>{p.title[language]}</h3><p>{p.category[language]}</p></div></article>)}</div></>}
   </SiteFrame>;
 }
 
