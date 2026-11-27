@@ -323,7 +323,7 @@ async function loginFixture(password: string) {
     256
   );
   const base64Url = (bytes: Uint8Array) =>
-    btoa(String.fromCharCode(...bytes)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+    btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
   const statements: Array<{ query: string; values: unknown[] }> = [];
   const db = {
     statements,
@@ -369,7 +369,7 @@ test("admin login creates a hashed session and returns a secure owner cookie for
   const cookie = response.headers.get("set-cookie") ?? "";
   const token = cookie.match(/__Host-gf_admin=([^;]+)/)?.[1] ?? "";
   assert.ok(token.length >= 40);
-  assert.match(cookie, /Path=\\//);
+  assert.ok(cookie.includes("Path=/;"));
   assert.match(cookie, /Max-Age=28800/);
   assert.match(cookie, /Secure/);
   assert.match(cookie, /HttpOnly/);
