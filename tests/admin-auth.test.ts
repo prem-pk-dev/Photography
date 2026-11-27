@@ -175,6 +175,69 @@ test("admin login does not accept GET requests", async () => {
   assert.equal(response.headers.get("Allow"), "POST");
 });
 
+test("authentication rate-limit keys hash the client IP and isolate purposes", async () => {
+  const ip = "203.0.113.42";
+  const rateLimitWrites: Array<{ query: string; values: unknown[] }> = [];
+  const db = {
+    prepare(query: string) {
+      const values: unknown[] = [];
+      return {
+        bind(...args: unknown[]) { values.push(...args); return this; },
+        async first<T>() {
+          if (query.includes("INSERT INTO auth_rate_limits")) {
+            rateLimitWrites.push({ query, values });
+            return { request_count: 1 } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; },
+      };
+    },
+    async batch(statements: unknown[]) {
+      return statements.map(() => ({ success: true, meta: { changes: 1 } }));
+    },
+  };
+
+  const loginRequest = () => worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": ip },
+    body: JSON.stringify({}),
+  }), { DB: db });
+
+  const setupRequest = () => worker.fetch(new Request("https://example.test/api/admin/setup", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "cf-connecting-ip": ip,
+      "x-admin-setup-secret": "expected-secret",
+    },
+    body: JSON.stringify({}),
+  }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
+
+  assert.equal((await loginRequest()).status, 401);
+  assert.equal((await setupRequest()).status, 400);
+  assert.equal((await loginRequest()).status, 401);
+  assert.equal(rateLimitWrites.length, 3);
+
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+  const ipHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  const [firstLogin, setup, secondLogin] = rateLimitWrites;
+  assert.equal(firstLogin.values[0], "login:" + ipHash);
+  assert.equal(setup.values[0], "setup:" + ipHash);
+  assert.equal(secondLogin.values[0], firstLogin.values[0]);
+  assert.equal(firstLogin.values[0].includes(ip), false);
+  assert.equal(setup.values[0].includes(ip), false);
+
+  for (const write of rateLimitWrites) {
+    assert.match(write.query, /ON CONFLICT\\(rate_key\\) DO UPDATE/);
+    assert.match(write.query, /CASE WHEN window_started_at < \\? THEN 1 ELSE request_count \\+ 1 END/);
+    assert.equal(typeof write.values[1], "number");
+    assert.equal(write.values[2], write.values[1]);
+    assert.equal(write.values[3], write.values[1]);
+  }
+});
+
 test("admin login rate limit blocks attempts before querying credentials", async () => {
   const db = mockDbWithBlockedAuthRateLimit();
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
