@@ -1,4 +1,4 @@
-const baseUrl = "https://9da22817.golden-films.pages.dev";
+const baseUrl = process.env.PREVIEW_BASE_URL ?? "https://test-preview-admin-auth-e2e.golden-films.pages.dev";
 const email = process.env.PREVIEW_ADMIN_EMAIL;
 const password = process.env.PREVIEW_ADMIN_PASSWORD;
 
