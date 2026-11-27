@@ -297,7 +297,7 @@ test("initial owner setup persists a normalized owner, password hash, completion
   const ownerInsert = db.statements.find(statement => statement.query.includes("INSERT INTO admin_users"));
   assert.ok(ownerInsert);
   assert.match(ownerInsert.query, /'owner'/);
-  assert.match(ownerInsert.query, /NOT EXISTS \\(SELECT 1 FROM admin_users\\)/);
+  assert.match(ownerInsert.query, /NOT EXISTS \(SELECT 1 FROM admin_users\)/);
   assert.match(ownerInsert.query, /completed_at IS NULL/);
   assert.equal(ownerInsert.values[1], "owner@example.test");
   assert.notEqual(ownerInsert.values[2], password);
@@ -310,13 +310,13 @@ test("initial owner setup persists a normalized owner, password hash, completion
   const setupCompletion = db.statements.find(statement => statement.query.includes("UPDATE admin_setup"));
   assert.ok(setupCompletion);
   assert.match(setupCompletion.query, /completed_at IS NULL/);
-  assert.match(setupCompletion.query, /EXISTS \\(SELECT 1 FROM admin_users WHERE id = \\?\\)/);
+  assert.match(setupCompletion.query, /EXISTS \(SELECT 1 FROM admin_users WHERE id = \?\)/);
   assert.equal(setupCompletion.values[0], ownerInsert.values[0]);
 
   const setupAudit = db.statements.find(statement => statement.query.includes("INSERT INTO audit_logs"));
   assert.ok(setupAudit);
-  assert.match(setupAudit.query, /SELECT \\?/);
-  assert.match(setupAudit.query, /WHERE EXISTS \\(SELECT 1 FROM admin_users WHERE id = \\?\\)/);
+  assert.match(setupAudit.query, /SELECT \?/);
+  assert.match(setupAudit.query, /WHERE EXISTS \(SELECT 1 FROM admin_users WHERE id = \?\)/);
   assert.equal(setupAudit.values[1], ownerInsert.values[0]);
   assert.equal(setupAudit.values[2], ownerInsert.values[0]);
 });
