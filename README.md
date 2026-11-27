@@ -6,13 +6,14 @@ A bilingual (English/Hindi) photography, videography, photo-editing and video-ed
 
 The responsive portfolio frontend and Cloudflare Pages Functions API bridge are in `main`. The UI includes 14 portfolio categories, services, sample-labelled demo imagery, an English/Hindi switcher, and an enquiry form wired to `POST /api/enquiries`.
 
-The API foundation, admin authentication/CMS routes, GitHub-backed media workflow, and read-only Pages API smoke checks are implemented. Production Pages Functions and the Production `DB` binding were confirmed in deployment metadata. The latest merged main commit is `41b16941ef2b1e3852877287aa505976843fe8c9`; its post-merge CI completed successfully.
+The API foundation, admin authentication/CMS routes, GitHub-backed media workflow, and read-only Pages API smoke checks are implemented. Production Pages Functions and the Production `DB` binding were confirmed in deployment metadata. The latest merged main commit verified on 2026-11-27 is `935ba885cd2ff82db42de4dabe359e39a6282b96`; its post-merge CI passed. The Cloudflare Pages check for that exact commit passed and returned `https://d47f4a75.golden-films.pages.dev`, explicitly labelled as a Preview URL. Production custom-domain promotion was not independently established by that check.
 
 ### Latest Preview verification (2026-11-27)
 
 - PR #128 added a secret-backed authenticated Preview Admin/CMS E2E workflow and was merged. On the exact PR head, the E2E assertions passed for login/session, authenticated identity and role, CMS page listing, home revision listing, logout, and rejection of the logged-out session. The standard CI suite also passed.
 - A subsequent Preview-only media upload test used the existing draft `Delete Test` project and isolated Preview D1. The Admin API/UI showed the private draft media record, immutable GitHub URL, and English/Hindi alt text. The Admin UI exposed an image element and Open media link; a separate byte-level fetch of the raw image URL was not independently confirmed.
 - The disposable test media and its Preview metadata were then deleted. Fresh Admin API data confirmed the test ID was absent and counts returned to the pre-test state: two pre-existing Delete Test media records and one Jaipur Wedding media record. Those older records were left untouched.
+- PR #129 refreshed the release documentation and was squash-merged as `935ba885cd2ff82db42de4dabe359e39a6282b96`. Exact-head standard CI, authenticated Preview E2E, and Preview deployment checks passed. Post-merge standard CI and the Cloudflare Pages check also passed; the returned Pages URL is labelled Preview, so this does not establish Production custom-domain promotion.
 - These Preview tests did not modify Production D1, Production secrets/bindings, customer records, or published portfolio content.
 
 ## Production D1 safety status
