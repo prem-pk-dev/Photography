@@ -312,3 +312,93 @@ test("initial owner setup rejects when the guarded owner insert creates no row",
   assert.equal(response.status, 409);
   assert.deepEqual(await response.json(), { error: "initial_setup_already_completed" });
 });
+
+
+async function loginFixture(password: string) {
+  const salt = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 100_000 },
+    key,
+    256
+  );
+  const base64Url = (bytes: Uint8Array) =>
+    btoa(String.fromCharCode(...bytes)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  const statements: Array<{ query: string; values: unknown[] }> = [];
+  const db = {
+    statements,
+    prepare(query: string) {
+      const values: unknown[] = [];
+      return {
+        bind(...args: unknown[]) { values.push(...args); statements.push({ query, values }); return this; },
+        async first<T>() {
+          if (query.includes("INSERT INTO auth_rate_limits")) return { request_count: 1 } as T;
+          if (query.includes("FROM admin_users WHERE email = ?")) {
+            return {
+              id: "owner-1",
+              email: "owner@example.test",
+              password_hash: base64Url(new Uint8Array(bits)),
+              password_salt: base64Url(salt),
+              role: "owner"
+            } as T;
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; }
+      };
+    }
+  };
+  return db;
+}
+
+test("admin login creates a hashed session and returns a secure owner cookie for valid credentials", async () => {
+  const password = "correct-horse-battery-staple";
+  const db = await loginFixture(password);
+  const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": "192.0.2.10" },
+    body: JSON.stringify({ email: "OWNER@example.test", password })
+  }), { DB: db });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    admin: { id: "owner-1", email: "owner@example.test", role: "owner" }
+  });
+  const cookie = response.headers.get("set-cookie") ?? "";
+  const token = cookie.match(/__Host-gf_admin=([^;]+)/)?.[1] ?? "";
+  assert.ok(token.length >= 40);
+  assert.match(cookie, /Path=\\//);
+  assert.match(cookie, /Max-Age=28800/);
+  assert.match(cookie, /Secure/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Strict/);
+
+  const sessionInsert = db.statements.find(item => item.query.includes("INSERT INTO admin_sessions"));
+  assert.ok(sessionInsert);
+  assert.notEqual(sessionInsert.values[2], token);
+  const expectedTokenHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const expectedHex = Array.from(new Uint8Array(expectedTokenHash), byte => byte.toString(16).padStart(2, "0")).join("");
+  assert.equal(sessionInsert.values[2], expectedHex);
+  assert.ok(db.statements.some(item => item.query.includes("UPDATE admin_users SET last_login_at")));
+  assert.ok(db.statements.some(item => item.query.includes("'login_success'")));
+  assert.equal(db.statements.some(item => item.values.includes(password)), false);
+});
+
+test("admin login rejects an incorrect password without creating a session or updating last login", async () => {
+  const db = await loginFixture("correct-horse-battery-staple");
+  const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": "192.0.2.11" },
+    body: JSON.stringify({ email: "owner@example.test", password: "incorrect-password-value" })
+  }), { DB: db });
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "invalid_credentials" });
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(db.statements.some(item => item.query.includes("INSERT INTO admin_sessions")), false);
+  assert.equal(db.statements.some(item => item.query.includes("UPDATE admin_users SET last_login_at")), false);
+  assert.ok(db.statements.some(item => item.query.includes("'login_failed'")));
+  assert.equal(db.statements.some(item => item.query.includes("'login_success'")), false);
+});
