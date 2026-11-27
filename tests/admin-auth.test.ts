@@ -96,12 +96,15 @@ function mockDbWithSetupValidation() {
 }
 
 function mockDbWithOwnerSetupBatch(insertChanges = 1) {
-  const statements: string[] = [];
+  const statements: Array<{ query: string; values: unknown[] }> = [];
+  let batchSize = 0;
   return {
     statements,
+    get batchSize() { return batchSize; },
     prepare(query: string) {
+      const values: unknown[] = [];
       return {
-        bind(..._args: unknown[]) { statements.push(query); return this; },
+        bind(...args: unknown[]) { values.push(...args); statements.push({ query, values }); return this; },
         async first<T>() {
           if (query.includes("INSERT INTO auth_rate_limits")) return { request_count: 1 } as T;
           return null as T | null;
@@ -110,7 +113,8 @@ function mockDbWithOwnerSetupBatch(insertChanges = 1) {
         async all<T>() { return { success: true, results: [] as T[] }; }
       };
     },
-    async batch(_batchStatements: unknown[]) {
+    async batch(batchStatements: unknown[]) {
+      batchSize = batchStatements.length;
       return [
         { success: true, meta: { changes: insertChanges } },
         { success: true, meta: { changes: insertChanges } },
@@ -277,29 +281,44 @@ test("initial owner setup fails closed when transactional D1 batch is unavailabl
   assert.deepEqual(await response.json(), { error: "admin_setup_unavailable" });
 });
 
-test("initial owner setup explicitly grants owner only when no admin exists and setup is incomplete", async () => {
+test("initial owner setup persists a normalized owner, password hash, completion and audit in one batch", async () => {
   const db = mockDbWithOwnerSetupBatch(1);
+  const password = "long-secure-password-123";
   const response = await worker.fetch(new Request("https://example.test/api/admin/setup", {
     method: "POST",
     headers: { "content-type": "application/json", "x-admin-setup-secret": "expected-secret" },
-    body: JSON.stringify({ email: "owner@example.test", password: "long-secure-password-123" })
+    body: JSON.stringify({ email: "OWNER@example.test", password })
   }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
+
   assert.equal(response.status, 201);
-  const setupInsert = db.statements.find(query => query.includes("INSERT INTO admin_users"));
-  assert.ok(setupInsert);
-  assert.match(setupInsert, /'owner'/);
-  assert.match(setupInsert, /NOT EXISTS \(SELECT 1 FROM admin_users\)/);
-  assert.match(setupInsert, /completed_at IS NULL/);
+  assert.deepEqual(await response.json(), { ok: true, message: "Initial owner created. Sign in to continue." });
+  assert.equal(db.batchSize, 3);
 
-  const setupCompletion = db.statements.find(query => query.includes("UPDATE admin_setup"));
+  const ownerInsert = db.statements.find(statement => statement.query.includes("INSERT INTO admin_users"));
+  assert.ok(ownerInsert);
+  assert.match(ownerInsert.query, /'owner'/);
+  assert.match(ownerInsert.query, /NOT EXISTS \\(SELECT 1 FROM admin_users\\)/);
+  assert.match(ownerInsert.query, /completed_at IS NULL/);
+  assert.equal(ownerInsert.values[1], "owner@example.test");
+  assert.notEqual(ownerInsert.values[2], password);
+  assert.equal(typeof ownerInsert.values[2], "string");
+  assert.ok((ownerInsert.values[2] as string).length >= 40);
+  assert.equal(typeof ownerInsert.values[3], "string");
+  assert.equal(atob((ownerInsert.values[3] as string).replace(/-/g, "+").replace(/_/g, "/") + "==").length, 16);
+  assert.equal(ownerInsert.values.includes(password), false);
+
+  const setupCompletion = db.statements.find(statement => statement.query.includes("UPDATE admin_setup"));
   assert.ok(setupCompletion);
-  assert.match(setupCompletion, /completed_at IS NULL/);
-  assert.match(setupCompletion, /EXISTS \(SELECT 1 FROM admin_users WHERE id = \?\)/);
+  assert.match(setupCompletion.query, /completed_at IS NULL/);
+  assert.match(setupCompletion.query, /EXISTS \\(SELECT 1 FROM admin_users WHERE id = \\?\\)/);
+  assert.equal(setupCompletion.values[0], ownerInsert.values[0]);
 
-  const setupAudit = db.statements.find(query => query.includes("INSERT INTO audit_logs"));
+  const setupAudit = db.statements.find(statement => statement.query.includes("INSERT INTO audit_logs"));
   assert.ok(setupAudit);
-  assert.match(setupAudit, /SELECT \?/);
-  assert.match(setupAudit, /WHERE EXISTS \(SELECT 1 FROM admin_users WHERE id = \?\)/);
+  assert.match(setupAudit.query, /SELECT \\?/);
+  assert.match(setupAudit.query, /WHERE EXISTS \\(SELECT 1 FROM admin_users WHERE id = \\?\\)/);
+  assert.equal(setupAudit.values[1], ownerInsert.values[0]);
+  assert.equal(setupAudit.values[2], ownerInsert.values[0]);
 });
 
 test("initial owner setup rejects when the guarded owner insert creates no row", async () => {
