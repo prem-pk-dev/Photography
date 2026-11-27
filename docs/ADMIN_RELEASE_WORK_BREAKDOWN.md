@@ -10,6 +10,8 @@ Last refreshed: **2026-11-27**
 - [x] Health endpoint regression test checks JSON content type, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`.
 - [x] PR #128 authenticated Preview Admin/CMS E2E workflow is merged; post-merge main CI passed on `41b16941ef2b1e3852877287aa505976843fe8c9`.
 - [x] PR #129 refreshed `README.md` and this release work breakdown; exact-head standard CI, authenticated Preview E2E, and Cloudflare Preview deployment passed. PR #129 was squash-merged as `935ba885cd2ff82db42de4dabe359e39a6282b96`; post-merge `build-and-test` and Cloudflare Pages checks passed on that exact SHA. The returned Pages URL `https://d47f4a75.golden-films.pages.dev` is labelled Preview; Production custom-domain promotion was not independently established.
+- [x] PR #130 corrected the latest-release checkpoint in `README.md` and this work breakdown; exact-head standard CI, authenticated Preview E2E, Cloudflare Preview, and post-merge CI/Pages checks passed. It was squash-merged as `ab5cc2d494154b0cafc098037939530cc0f95829`; the post-merge Pages URL `https://07c5d627.golden-films.pages.dev` is Preview only.
+- [x] PR #131 added four mock-D1 CMS draft/revision tests in `tests/admin-content.test.ts`: authenticated editor draft save with revision/audit records; invalid fields/markup rejected before writes; revision restore saved as a draft (not published); malformed stored revision JSON rejected without writes. Exact-head standard CI (`46009864903`), authenticated Preview E2E (`46009864816`), and Pages Preview (`https://bf88ac9e.golden-films.pages.dev`) passed. PR #131 was squash-merged as `fa96e0e70556dbecbe8e41f72ac195298c6c8fd4`; post-merge CI (`46010011499`) and Cloudflare Pages check passed, returning Preview URL `https://105d60cf.golden-films.pages.dev`. Production custom-domain promotion was not established.
 - [x] Authenticated Preview E2E passed on exact PR head `48bb63f9e26ceb176bb2f359cc0c6f8c1b8aa3b6`: login/session, authenticated identity and role, CMS listing, home revision listing, logout, and post-logout session rejection.
 - [x] Exact PR #128 Preview deployment was confirmed successful for its head; post-merge main CI completed successfully. A later Pages deployment check reported success for the merge SHA with a Preview URL; Production custom-domain promotion was not independently established by that check.
 - [x] Preview-only GitHub media upload test and cleanup completed on 2026-11-27; details below.
@@ -55,7 +57,8 @@ See [Production D1 Migration Gate](./PRODUCTION_D1_MIGRATION_GATE.md) for the fu
 - [ ] Verify owner setup rejects missing/wrong setup secret and invalid password input.
 - [ ] Verify first owner setup succeeds once, repeat setup is rejected, and owner role is assigned only through the guarded setup path. Perform only against a fresh isolated Preview database, never Production.
 - [ ] Verify rate limiting and audit events for success/failure paths.
-- [ ] Verify CMS draft/save/revision/publish mutations and owner/editor permission boundaries.
+- [x] Add mock-D1 regression coverage for editor draft save, validation rejection, revision restore-as-draft, and malformed revision rejection (PR #131). These are unit-level tests, not live Preview mutations.
+- [ ] Verify live Preview CMS draft/save/revision/publish mutations and owner/editor permission boundaries against an isolated Preview database.
 - [ ] Perform account-creation and authenticated mutation tests only against an isolated Preview database. Never create a test owner in Production.
 
 ### Media
