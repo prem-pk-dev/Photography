@@ -230,8 +230,8 @@ test("authentication rate-limit keys hash the client IP and isolate purposes", a
   assert.equal(setup.values[0].includes(ip), false);
 
   for (const write of rateLimitWrites) {
-    assert.match(write.query, /ON CONFLICT\\(rate_key\\) DO UPDATE/);
-    assert.match(write.query, /CASE WHEN window_started_at < \\? THEN 1 ELSE request_count \\+ 1 END/);
+    assert.match(write.query, /ON CONFLICT\(rate_key\) DO UPDATE/);
+    assert.match(write.query, /CASE WHEN window_started_at < \? THEN 1 ELSE request_count \+ 1 END/);
     assert.equal(typeof write.values[1], "number");
     assert.equal(write.values[2], write.values[1]);
     assert.equal(write.values[3], write.values[1]);
