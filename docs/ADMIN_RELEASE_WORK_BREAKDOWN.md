@@ -1,21 +1,18 @@
 # Admin Release Work Breakdown — Current Status
 
-Last refreshed: **2026-11-21**
+Last refreshed: **2026-11-27**
 
 ## Current release snapshot
 
-- [x] Admin login, owner setup, dashboard, and Pages Functions API bridge are merged in main (PR #81).
-- [x] GitHub-backed media upload and owner-only permanent delete are merged (PR #93).
-- [x] Read-only Pages API smoke script and offline input-safety tests are merged (PR #94).
-- [x] Health endpoint regression test checks JSON content type, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff` (PR #95).
-- [x] Production D1 migration gate documentation refreshed using the 2026-11-21 read-only schema audit (PR #96).
-- [x] Old API bridge draft PR #63 closed as superseded by main and PR #94/#95.
-- [x] Old Supabase Storage draft PR #87 closed as superseded by the selected GitHub media architecture. Its source branch was retained; no Supabase Storage integration was activated.
-- [x] Production Pages deployment for main commit `8243a08a9ee076c1acabde32611ad5aa8996f765` completed successfully and reports `uses_functions: true`.
-- [x] Preview Pages API read-only smoke workflow passed after PR #99 (run [#44918699501](https://github.com/prem-pk-dev/Photography/actions/runs/44918699501) was the earlier failed pre-fix run; the successful post-fix run was user-confirmed without a run ID).
-- [x] Unauthenticated admin session smoke check is merged (PR #102): `GET /api/admin/session` without a cookie must return HTTP 401 and JSON `{ "authenticated": false }`.
-- [x] Manual Preview smoke workflow including the unauthenticated admin session check passed: [run #44921986372](https://github.com/prem-pk-dev/Photography/actions/runs/44921986372). GitHub reports completed/success on branch `test/read-only-admin-session-smoke`, exact head `a0101098301f5701a85c83b025732f211d5e99e1`; the smoke job and its read-only API smoke step both passed.
-- [ ] Live authenticated browser/API E2E for owner setup, login, authenticated session, logout, CMS revision/publish, and role boundaries remains unverified.
+- [x] Admin login, owner setup, dashboard, and Pages Functions API bridge are merged in `main`.
+- [x] GitHub-backed media upload and owner-only permanent delete are merged. GitHub token remains server-side.
+- [x] Read-only Pages API smoke script and offline input-safety tests are merged.
+- [x] Health endpoint regression test checks JSON content type, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`.
+- [x] PR #128 authenticated Preview Admin/CMS E2E workflow is merged; post-merge main CI passed on `41b16941ef2b1e3852877287aa505976843fe8c9`.
+- [x] Authenticated Preview E2E passed on exact PR head `48bb63f9e26ceb176bb2f359cc0c6f8c1b8aa3b6`: login/session, authenticated identity and role, CMS listing, home revision listing, logout, and post-logout session rejection.
+- [x] Exact PR #128 Preview deployment was confirmed successful for its head; post-merge main CI completed successfully. A later Pages deployment check reported success for the merge SHA with a Preview URL; Production custom-domain promotion was not independently established by that check.
+- [x] Preview-only GitHub media upload test and cleanup completed on 2026-11-27; details below.
+- [ ] Owner setup success/rejection paths, password validation, rate limiting/audit events, CMS write/revision/publish mutations, and owner/editor permission boundaries still need isolated Preview verification.
 - [ ] Production D1 migration rehearsal remains blocked until an approved export is restored into a disposable database and the exact forward migration is tested for data preservation and integrity.
 - [x] R2 integration remains on hold; no R2 enablement or paid subscription is planned.
 
@@ -46,29 +43,29 @@ See [Production D1 Migration Gate](./PRODUCTION_D1_MIGRATION_GATE.md) for the fu
 
 - [x] Pages Functions catch-all route delegates `/api/*` to the shared Worker handler and is in main.
 - [x] Production deployment metadata confirms Functions are active and the D1 binding is present.
-- [x] `scripts/smoke-pages-api.mjs` is available. It performs HTTPS-only, GET-only checks for `/api/health`, `/api/ready`, `/api/admin/session`, and `/api/content?page=home`; it refuses non-HTTPS URLs and redirects.
-- [x] Manual Pages API read-only smoke workflow passed against the PR #102 Preview build, including the unauthenticated admin session contract (run [#44921986372](https://github.com/prem-pk-dev/Photography/actions/runs/44921986372)).
-- [ ] If a future Preview smoke test fails, diagnose Preview bindings/schema without changing Production.
+- [x] `scripts/smoke-pages-api.mjs` performs HTTPS-only, GET-only checks for `/api/health`, `/api/ready`, `/api/admin/session`, and `/api/content?page=home`; it refuses non-HTTPS URLs and redirects.
+- [x] Manual Preview API smoke workflow passed, including the unauthenticated admin session contract (HTTP 401 and `{ "authenticated": false }`).
+- [ ] Re-run/diagnose Preview API readiness if a future deployment changes bindings or schema; do not change Production to repair Preview.
 
 ### Authentication and CMS
 
-- [x] Verify unauthenticated `GET /api/admin/session` returns HTTP 401 and JSON `{ "authenticated": false }` without a session cookie (PR #102 unit contract and successful Preview smoke run #44921986372).
+- [x] Unauthenticated `GET /api/admin/session` returns HTTP 401 and JSON `{ "authenticated": false }` without a session cookie (unit contract and successful Preview smoke).
+- [x] Authenticated Preview E2E verifies login, Secure session behavior at the test contract level, authenticated session identity/role, CMS page listing, home revision listing, logout, and rejection of the revoked session.
 - [ ] Verify owner setup rejects missing/wrong setup secret and invalid password input.
-- [ ] Verify first owner setup succeeds once, repeat setup is rejected, and the owner role is assigned only through the guarded setup path.
-- [ ] Verify login sets the expected Secure, HttpOnly, SameSite=Strict session cookie.
-- [ ] Verify authenticated session validity, logout revocation, and that the old session no longer authenticates.
+- [ ] Verify first owner setup succeeds once, repeat setup is rejected, and owner role is assigned only through the guarded setup path. Perform only against a fresh isolated Preview database, never Production.
 - [ ] Verify rate limiting and audit events for success/failure paths.
-- [ ] Verify CMS draft/save/revision/publish behavior and owner/editor permission boundaries.
-- [ ] Perform account-creation and authenticated tests only against the isolated Preview database. Never create a test owner in Production.
+- [ ] Verify CMS draft/save/revision/publish mutations and owner/editor permission boundaries.
+- [ ] Perform account-creation and authenticated mutation tests only against an isolated Preview database. Never create a test owner in Production.
 
 ### Media
 
 - [x] GitHub-backed upload path is merged; the GitHub token remains server-side.
 - [x] Owner-only permanent deletion requires typed confirmation, blocks project covers and legacy URL media, and is covered by regression tests.
-- [x] Disposable Preview-only Delete Test object was removed from GitHub and its Preview D1 row was independently verified absent.
-- [ ] Run non-destructive upload/read/alt-text smoke tests against Preview using a disposable test project.
-- [ ] Do not delete or modify existing portfolio media during verification. Use disposable Preview-only objects.
-- [x] R2 work is explicitly on hold; no subscription or paid resource may be introduced.
+- [x] Preview upload test: owner uploaded one disposable JPG as a private draft to the existing `Delete Test` project, with English alt text `A sample test photograph` and Hindi alt text `एक नमूना परीक्षण तस्वीर`. Publish and cover options remained unchecked.
+- [x] Preview Admin API/UI showed the new media ID, immutable GitHub raw URL, bilingual alt text, private-draft status, image element, and Open media link. A separate byte-level fetch of the raw image URL was not independently confirmed.
+- [x] Cleanup: owner deleted only the disposable test media. Fresh Preview Admin API response confirmed its media ID was absent and counts returned to baseline: 2 pre-existing media items under Delete Test and 1 under Jaipur Wedding (3 total).
+- [x] The two pre-existing Delete Test media records and Jaipur Wedding media were left untouched; the Delete Test project itself remains present.
+- [x] R2 work is explicitly on hold; no subscription or paid resource was introduced.
 
 ## Production D1 migration rehearsal — BLOCKED
 
@@ -81,22 +78,27 @@ See [Production D1 Migration Gate](./PRODUCTION_D1_MIGRATION_GATE.md) for the fu
 - [ ] Repeat from a fresh restore and document recovery limits.
 - [ ] Obtain explicit approval before any Production D1 write/migration, secret change, or binding change.
 
-## PR workflow
+## Strict branch and PR workflow
 
-For every distinct task:
-1. Create a new branch and a new PR.
-2. Keep the PR Ready for review once the scope is complete and checks are running; do not leave completed work in Draft for a long time.
-3. Run the relevant tests and exact-head CI checks; verify Preview when the change affects runtime behavior.
-4. Merge promptly after all required checks pass and no safety gate blocks the task.
-5. Start the next distinct task in a new PR.
+For every distinct task, follow the user's sequential workflow:
 
-Code-only PR merges do not authorize Production D1 writes, migrations, or secret/binding changes. Keep the Production data-safety gate separate and explicit.
+1. Before starting, check open PRs and branches.
+2. If a PR is open, finish that exact PR first. Do not create another branch or PR while it remains open.
+3. Work on one distinct task in one branch and one PR only. Do not accumulate multiple open or Draft PRs.
+4. Complete implementation and relevant tests in the active workstream before marking the PR Ready for review.
+5. Require exact-head CI and relevant Preview verification before merge. Merge only after all applicable gates pass.
+6. After merge, verify `main` points to the merge SHA, post-merge CI passes, and exact-commit Production deployment succeeds where applicable. Do not claim Production deployment from a Preview URL/check alone.
+7. If branch cleanup is needed, tell the user the exact branch name and link. The user deletes it manually; independently verify cleanup before starting the next branch/PR.
+8. If blocked by missing owner input, approved export, credentials, or QA access, record the blocker and wait. Do not open a placeholder/speculative PR.
+
+Code-only PR merges do not authorize Production D1 writes, migrations, or secret/binding changes.
 
 ## Safety rules
 
+- Keep the project at **₹0**. Never enable paid plans, subscriptions, billing, or billable resources without explicit approval.
 - Never apply `migrations/0001_initial_schema.sql` as a blanket migration to the existing Production database.
 - Never use Production D1 for Preview testing.
 - Never fabricate historical consent or automatically elevate legacy admin accounts to owner.
-- Never paste secrets into chat, source code, logs, or documentation.
+- Never paste passwords, API tokens, secrets, or private data into chat, source code, logs, or documentation.
 - A green CI run or successful Pages deployment alone does not prove live API/authentication behavior.
-- Keep all solutions within the zero-budget constraint; no R2, paid subscription, or paid service enablement.
+- Do not activate customer booking until Production D1 schema safety is established and separately approved.
