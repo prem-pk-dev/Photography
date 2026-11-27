@@ -402,3 +402,57 @@ test("admin login rejects an incorrect password without creating a session or up
   assert.ok(db.statements.some(item => item.query.includes("'login_failed'")));
   assert.equal(db.statements.some(item => item.query.includes("'login_success'")), false);
 });
+
+
+function mockDbWithAuthRateLimitFailure() {
+  const queries: string[] = [];
+  return {
+    queries,
+    prepare(query: string) {
+      return {
+        bind(..._args: unknown[]) { queries.push(query); return this; },
+        async first<T>() {
+          if (query.includes("INSERT INTO auth_rate_limits")) {
+            throw new Error("rate limit storage unavailable");
+          }
+          return null as T | null;
+        },
+        async run() { return { success: true, meta: { changes: 0 } }; },
+        async all<T>() { return { success: true, results: [] as T[] }; }
+      };
+    }
+  };
+}
+
+test("admin login fails closed when the authentication rate-limit store is unavailable", async () => {
+  const db = mockDbWithAuthRateLimitFailure();
+  const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": "192.0.2.20" },
+    body: JSON.stringify({ email: "owner@example.test", password: "correct-horse-battery-staple" })
+  }), { DB: db });
+
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "temporarily_unavailable" });
+  assert.ok(db.queries.some(query => query.includes("INSERT INTO auth_rate_limits")));
+  assert.equal(db.queries.some(query => query.includes("FROM admin_users")), false);
+  assert.equal(db.queries.some(query => query.includes("INSERT INTO admin_sessions")), false);
+});
+
+test("initial owner setup fails closed when the authentication rate-limit store is unavailable", async () => {
+  const db = mockDbWithAuthRateLimitFailure();
+  const response = await worker.fetch(new Request("https://example.test/api/admin/setup", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-admin-setup-secret": "expected-secret"
+    },
+    body: JSON.stringify({ email: "owner@example.test", password: "long-secure-password-123" })
+  }), { DB: db, ADMIN_SETUP_SECRET: "expected-secret" });
+
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "temporarily_unavailable" });
+  assert.ok(db.queries.some(query => query.includes("INSERT INTO auth_rate_limits")));
+  assert.equal(db.queries.some(query => query.includes("INSERT INTO admin_users")), false);
+  assert.equal(db.queries.some(query => query.includes("UPDATE admin_setup")), false);
+});
