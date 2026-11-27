@@ -9,6 +9,7 @@ Last refreshed: **2026-11-27**
 - [x] Read-only Pages API smoke script and offline input-safety tests are merged.
 - [x] Health endpoint regression test checks JSON content type, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`.
 - [x] PR #128 authenticated Preview Admin/CMS E2E workflow is merged; post-merge main CI passed on `41b16941ef2b1e3852877287aa505976843fe8c9`.
+- [x] PR #129 refreshed `README.md` and this release work breakdown; exact-head standard CI, authenticated Preview E2E, and Cloudflare Preview deployment passed. PR #129 was squash-merged as `935ba885cd2ff82db42de4dabe359e39a6282b96`; post-merge `build-and-test` and Cloudflare Pages checks passed on that exact SHA. The returned Pages URL `https://d47f4a75.golden-films.pages.dev` is labelled Preview; Production custom-domain promotion was not independently established.
 - [x] Authenticated Preview E2E passed on exact PR head `48bb63f9e26ceb176bb2f359cc0c6f8c1b8aa3b6`: login/session, authenticated identity and role, CMS listing, home revision listing, logout, and post-logout session rejection.
 - [x] Exact PR #128 Preview deployment was confirmed successful for its head; post-merge main CI completed successfully. A later Pages deployment check reported success for the merge SHA with a Preview URL; Production custom-domain promotion was not independently established by that check.
 - [x] Preview-only GitHub media upload test and cleanup completed on 2026-11-27; details below.
