@@ -4,9 +4,16 @@ A bilingual (English/Hindi) photography, videography, photo-editing and video-ed
 
 ## Current milestone
 
-The responsive portfolio frontend and Cloudflare Pages Functions API bridge are in the main branch. The UI includes 14 portfolio categories, services, sample-labelled demo imagery, an English/Hindi switcher, and an enquiry form wired to `POST /api/enquiries`.
+The responsive portfolio frontend and Cloudflare Pages Functions API bridge are in `main`. The UI includes 14 portfolio categories, services, sample-labelled demo imagery, an English/Hindi switcher, and an enquiry form wired to `POST /api/enquiries`.
 
-The API foundation, admin authentication/CMS routes, GitHub-backed media workflow, and read-only Pages API smoke checks are implemented in the repository. Production Pages deployment metadata confirms that Pages Functions are active and the `DB` binding points to the existing `golden-films-db` D1 database. A manual, GET-only Pages API smoke workflow against Preview was subsequently reported successful by the repository owner (green GitHub Actions check, 2026-11-21). This Preview result must not be interpreted as proof that authenticated admin/CMS flows or Production writes have been validated.
+The API foundation, admin authentication/CMS routes, GitHub-backed media workflow, and read-only Pages API smoke checks are implemented. Production Pages Functions and the Production `DB` binding were confirmed in deployment metadata. The latest merged main commit is `41b16941ef2b1e3852877287aa505976843fe8c9`; its post-merge CI completed successfully.
+
+### Latest Preview verification (2026-11-27)
+
+- PR #128 added a secret-backed authenticated Preview Admin/CMS E2E workflow and was merged. On the exact PR head, the E2E assertions passed for login/session, authenticated identity and role, CMS page listing, home revision listing, logout, and rejection of the logged-out session. The standard CI suite also passed.
+- A subsequent Preview-only media upload test used the existing draft `Delete Test` project and isolated Preview D1. The Admin API/UI showed the private draft media record, immutable GitHub URL, and English/Hindi alt text. The Admin UI exposed an image element and Open media link; a separate byte-level fetch of the raw image URL was not independently confirmed.
+- The disposable test media and its Preview metadata were then deleted. Fresh Admin API data confirmed the test ID was absent and counts returned to the pre-test state: two pre-existing Delete Test media records and one Jaipur Wedding media record. Those older records were left untouched.
+- These Preview tests did not modify Production D1, Production secrets/bindings, customer records, or published portfolio content.
 
 ## Production D1 safety status
 
@@ -14,7 +21,7 @@ Production D1: `golden-films-db` (ID `0241231b-6e6c-410b-a5ac-958eeb424a78`).
 
 A read-only catalog/PRAGMA audit on 2026-11-21 confirmed the queried Worker-facing tables and columns, including categories, projects, translations, project media, enquiries, admin users/sessions, CMS content/revisions, and rate-limit/audit tables. The audit reported `changed_db: false` and `rows_written: 0`; no row contents were read.
 
-The `d1_migrations` history table was absent. No Production export has yet been downloaded and restored into a separate disposable D1 database. The exact historical migration path and data-preservation behavior therefore remain unverified. **Do not apply baseline migrations `0001`–`0006` blindly to Production.** First plan an approved export/maintenance window, restore to a disposable database, test the exact forward-only migration, and verify data preservation and integrity. Obtain explicit approval before any Production D1 write/migration, secret change, or binding change.
+The `d1_migrations` history table was absent. No Production export has yet been downloaded and restored into a separate disposable D1 database. The exact historical migration path and data-preservation behavior therefore remain unverified. **Do not apply baseline migrations `0001`–`0006` blindly to Production.** First plan an approved export/maintenance window, restore to a disposable database, test the exact forward-only migration, and verify data preservation and integrity. Obtain explicit approval before any Production D1 write/migration, secret change, or binding change. See [Production D1 Migration Gate](docs/PRODUCTION_D1_MIGRATION_GATE.md).
 
 ## Local development
 
@@ -52,9 +59,9 @@ All placeholder/demo media must be clearly labelled as sample content and must n
 ## Current limitations and verification gates
 
 - Owner-provided phone, WhatsApp and email contact details are published on the Contact page; an Instagram handle has not been supplied.
-- The Preview Pages API read-only smoke workflow has passed according to the owner. The script checks `GET /api/health`, `GET /api/ready`, and `GET /api/content?page=home`; it refuses non-HTTPS URLs and redirects.
-- Live authenticated browser/API E2E remains unverified: owner setup, login/session/logout, rate limiting/audit events, CMS revisions/publish, and owner/editor permission boundaries still need isolated Preview verification.
-- Non-destructive GitHub-backed media upload/read/alt-text verification against a disposable Preview project remains pending. Do not modify existing portfolio media during testing.
+- The Preview read-only Pages API smoke workflow covers `GET /api/health`, `GET /api/ready`, `GET /api/admin/session`, and `GET /api/content?page=home`; the authenticated Preview E2E separately covers login/session, CMS listing/revisions reads, and logout on its recorded exact head.
+- Owner setup success/rejection paths, password validation, rate limiting/audit events, CMS draft/save/publish mutations, and owner/editor permission boundaries still need isolated Preview verification. Do not use Production for these tests.
+- The disposable Preview GitHub media upload/metadata test and cleanup are complete. The Admin UI displayed the image element and immutable URL; direct raw-image byte retrieval was not independently verified. No test media record remains.
 - Production D1 migration rehearsal remains blocked pending an approved export restored into a disposable database and a successful exact forward-migration test. Never use Production D1 for Preview testing.
 - Password recovery, email verification, and email notifications remain unimplemented.
 - No paid Cloudflare resource is enabled. R2 remains on hold.
