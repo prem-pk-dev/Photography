@@ -87,6 +87,9 @@ function authenticatedContentDb(role: "owner" | "editor", revision?: { id: strin
           if (query.includes("SELECT id, page_slug, content_json FROM site_content_revisions")) {
             return (revision ?? null) as T | null;
           }
+          if (query.includes("SELECT draft_json FROM site_content WHERE page_slug = ?")) {
+            return { draft_json: JSON.stringify({ heroTitleEn: "Ready to publish", heroTitleHi: "प्रकाशित करने के लिए तैयार" }) } as T;
+          }
           return null as T | null;
         },
         async run() {
@@ -191,3 +194,38 @@ test("CMS revision restore rejects invalid stored JSON without creating a draft"
   assert.equal(db.writes.length, 0);
 });
 
+
+
+test("only an owner can publish a CMS draft and publication records revision plus audit event", async () => {
+  const db = authenticatedContentDb("owner");
+  const response = await worker.fetch(authenticatedContentRequest("/api/admin/content/publish", {
+    page: "home"
+  }), { DB: db });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, page: "home", status: "published" });
+  assert.equal(db.writes.length, 3);
+  assert.match(db.writes[0].query, /UPDATE site_content SET published_json = draft_json, status = 'published'/);
+  assert.deepEqual(db.writes[0].values, ["owner-1", "home"]);
+  assert.match(db.writes[1].query, /INSERT INTO site_content_revisions/);
+  assert.match(db.writes[1].query, /'published'/);
+  assert.deepEqual(db.writes[1].values.slice(1), [
+    "home",
+    JSON.stringify({ heroTitleEn: "Ready to publish", heroTitleHi: "प्रकाशित करने के लिए तैयार" }),
+    "owner-1"
+  ]);
+  assert.match(db.writes[2].query, /INSERT INTO audit_logs/);
+  assert.match(db.writes[2].query, /'content_published'/);
+});
+
+test("an editor cannot publish a CMS draft or reach publication writes", async () => {
+  const db = authenticatedContentDb("editor");
+  const response = await worker.fetch(authenticatedContentRequest("/api/admin/content/publish", {
+    page: "home"
+  }), { DB: db });
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "forbidden" });
+  assert.equal(db.writes.length, 0);
+  assert.equal(db.reads.some(query => query.includes("UPDATE site_content SET published_json")), false);
+});
