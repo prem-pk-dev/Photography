@@ -21,6 +21,13 @@ The API foundation, admin authentication/CMS routes, GitHub-backed media workflo
 - PR #144 was squash-merged as `c2a979b7b13704ae9764b9be510726b93b2f9eba`. Cloudflare dashboard mapping confirms Environment `Production`, Source `main`, commit `c2a979b`, deployment URL `https://23e605a9.golden-films.pages.dev`, and Production domain `https://golden-films.pages.dev`.
 - These Preview tests did not modify Production D1, Production secrets/bindings, customer records, or published portfolio content. The showreel change did not modify Production database/configuration.
 
+### PR #147 — bilingual booking-unavailable Production verification (2026-11-28)
+
+- PR #147 was squash-merged as `eb9757bd1e28878b85a5a591292e7bffbbe5d466`. The exact `main` merge SHA passed post-merge CI and the Cloudflare Pages deployment check; the Cloudflare dashboard confirmed Environment `Production`, Source `main`, and commit `eb9757b`.
+- Production `/book/` was freshly inspected in Chrome in both English and Hindi. The document titles, localized unavailable-booking copy, navigation/language links, and WhatsApp, telephone, and email destinations were verified.
+- Booking remains intentionally unavailable. This change only corrects SEO metadata and localized unavailable-state copy; it does not activate booking or modify Production D1, secrets, bindings, customer records, or billing.
+- PRs #145 and #146 were documentation-only updates; their exact-head checks, post-merge CI/Pages checks, and Production deployment mappings were verified before PR #147.
+
 ## Production D1 safety status
 
 Production D1: `golden-films-db` (ID `0241231b-6e6c-410b-a5ac-958eeb424a78`).
