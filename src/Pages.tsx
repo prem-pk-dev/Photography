@@ -1320,7 +1320,7 @@ function CustomerBookingPage() {
     finally{setBusy(false);}
   };
   const logout=async()=>{await fetch("/api/customer/logout",{method:"POST",credentials:"same-origin"});setCustomer(null);setBookings([]);};
-  if(!readinessChecked) return <SiteFrame eyebrow={language === "hi" ? "CUSTOMER BOOKING" : "CUSTOMER BOOKING"} title={language === "hi" ? "बुकिंग की उपलब्धता" : "Booking availability"}><p className="section-subtitle">{language === "hi" ? "बुकिंग सेवा की उपलब्धता जाँची जा रही है…" : "Checking booking service availability…"}</p></SiteFrame>;
+  if(!readinessChecked) return <SiteFrame eyebrow={language === "hi" ? "ग्राहक बुकिंग" : "CUSTOMER BOOKING"} title={language === "hi" ? "बुकिंग की उपलब्धता" : "Booking availability"}><p className="section-subtitle">{language === "hi" ? "बुकिंग सेवा की उपलब्धता जाँची जा रही है…" : "Checking booking service availability…"}</p></SiteFrame>;
   if(!serviceReady) return <SiteFrame eyebrow={unavailableCopy.eyebrow} title={unavailableCopy.title}>
     <div className="service-card" style={{maxWidth:720}}>
       <p className="section-subtitle">{unavailableCopy.description}</p>
