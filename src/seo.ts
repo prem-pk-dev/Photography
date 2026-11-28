@@ -44,7 +44,7 @@ const pageCopy: Record<string, { en: [string, string]; hi: [string, string] }> =
 export function getBookingUnavailableCopy(language: SiteLanguage): { eyebrow: string; title: string; description: string } {
   return language === "hi"
     ? {
-        eyebrow: "CUSTOMER BOOKING",
+        eyebrow: "ग्राहक बुकिंग",
         title: "ऑनलाइन बुकिंग फिलहाल उपलब्ध नहीं",
         description: "बुकिंग सेवा तैयार होने तक ऑनलाइन बुकिंग अस्थायी रूप से उपलब्ध नहीं है। कोई खाता या बुकिंग अनुरोध सबमिट नहीं किया गया है। उपलब्धता जानने के लिए कृपया सीधे Golden Films से संपर्क करें।"
       }
