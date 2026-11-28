@@ -133,10 +133,7 @@ const services = [
 ];
 const filterKeys = ["all", "photography", "videography", "editing"] as const;
 const showreelVideos = [
-  { id: "cinematic-showcase", title: { en: "Cinematic Photography Showcase", hi: "सिनेमैटिक फोटोग्राफी शोकेस" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-cinematic-showcase.mp4" },
-  { id: "visual-story", title: { en: "Photography Visual Story", hi: "फोटोग्राफी विजुअल स्टोरी" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-visual-story.mp4" },
-  { id: "gemini-motion-01", title: { en: "Gemini Motion Sample 01", hi: "Gemini मोशन नमूना 01" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-gemini-motion-01.mp4" },
-  { id: "gemini-motion-02", title: { en: "Gemini Motion Sample 02", hi: "Gemini मोशन नमूना 02" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-gemini-motion-02.mp4" }
+  { id: "cinematic-showcase", title: { en: "Cinematic Photography Showcase", hi: "सिनेमैटिक फोटोग्राफी शोकेस" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-cinematic-showcase.mp4" }
 ];
 
 export default function App() {
