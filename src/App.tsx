@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Aperture, ArrowDownRight, ArrowRight, Camera, Check, Clapperboard,
-  Film, Image as ImageIcon, Languages, Menu, MessageCircle, Play, Send, Sparkles,
+  Film, Image as ImageIcon, Languages, Menu, MessageCircle, Send, Sparkles,
   WandSparkles, X
 } from "lucide-react";
 import { categories, heroImage, projects, type Language, type PortfolioGroup } from "./data";
@@ -34,7 +34,8 @@ const copy = {
     aboutPlaceholder: "Personal bio to be added",
     showreelEyebrow: "A MOVING PICTURE",
     showreelTitle: "Showreel preview",
-    showreelText: "These are demo thumbnails. Real film links can be added when approved videos are available.",
+    showreelText: "These AI-generated videos are visual samples created with Google Gemini, not client commissions or recorded photography assignments.",
+    showreelDemo: "AI-GENERATED DEMO",
     previewOnly: "Preview only",
     contactEyebrow: "LET'S MAKE SOMETHING MEANINGFUL",
     contactTitle: "Tell us about your story.",
@@ -90,7 +91,8 @@ const copy = {
     aboutPlaceholder: "व्यक्तिगत परिचय बाद में जोड़ा जाएगा",
     showreelEyebrow: "चलती तस्वीरों की कहानी",
     showreelTitle: "शो-रील प्रीव्यू",
-    showreelText: "ये डेमो थंबनेल हैं। मंजूर किए गए वीडियो उपलब्ध होने पर असली फिल्म लिंक जोड़े जा सकते हैं।",
+    showreelText: "ये Google Gemini से बनाए गए AI वीडियो नमूने हैं, वास्तविक क्लाइंट प्रोजेक्ट या शूट किए गए असाइनमेंट नहीं।",
+    showreelDemo: "AI से बना डेमो",
     previewOnly: "केवल प्रीव्यू",
     contactEyebrow: "आइए कुछ खास बनाएँ",
     contactTitle: "अपनी कहानी के बारे में बताएँ।",
@@ -130,6 +132,12 @@ const services = [
   { id: "video-editing", icon: Clapperboard, title: { en: "Video editing", hi: "वीडियो एडिटिंग" }, detail: { en: "Cinematic cuts, color grading, reels and short-form edits.", hi: "सिनेमैटिक कट्स, कलर ग्रेडिंग, रील्स और शॉर्ट एडिट्स।" } }
 ];
 const filterKeys = ["all", "photography", "videography", "editing"] as const;
+const showreelVideos = [
+  { id: "cinematic-showcase", title: { en: "Cinematic Photography Showcase", hi: "सिनेमैटिक फोटोग्राफी शोकेस" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-cinematic-showcase.mp4" },
+  { id: "visual-story", title: { en: "Photography Visual Story", hi: "फोटोग्राफी विजुअल स्टोरी" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-visual-story.mp4" },
+  { id: "gemini-motion-01", title: { en: "Gemini Motion Sample 01", hi: "Gemini मोशन नमूना 01" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-gemini-motion-01.mp4" },
+  { id: "gemini-motion-02", title: { en: "Gemini Motion Sample 02", hi: "Gemini मोशन नमूना 02" }, url: "https://media-assets-4sb.pages.dev/videos/photography/photography-gemini-motion-02.mp4" }
+];
 
 export default function App() {
   const [language, setLanguage] = useState<Language>("en");
@@ -317,10 +325,17 @@ export default function App() {
             <div><p className="eyebrow">{t.showreelEyebrow}</p><h2>{t.showreelTitle}</h2><p className="section-subtitle">{t.showreelText}</p></div>
           </div>
           <div className="showreel-grid">
-            {projects.filter((project) => project.group === "videography" || project.group === "editing").slice(0, 3).map((project, index) => (
-              <article className="showreel-card" key={project.id}>
-                <div className="showreel-image"><img src={project.image} alt={project.imageAlt[language]} loading="lazy" /><span className="demo-tag">{t.demo}</span><span className="play-button" aria-hidden="true"><Play size={18} fill="currentColor" /></span><span className="showreel-duration">0{index + 1} · DEMO</span></div>
-                <h3>{project.title[language]}</h3><p>{project.category[language]}</p>
+            {showreelVideos.map((video) => (
+              <article className="showreel-card" key={video.id}>
+                <div className="showreel-image">
+                  <video controls preload="metadata" playsInline aria-label={video.title[language]}>
+                    <source src={video.url} type="video/mp4" />
+                    {language === "en" ? "Your browser does not support HTML video." : "आपका ब्राउज़र HTML वीडियो सपोर्ट नहीं करता।"}
+                  </video>
+                  <span className="demo-tag">{t.showreelDemo}</span>
+                </div>
+                <h3>{video.title[language]}</h3>
+                <p>{language === "en" ? "AI-generated visual sample · Google Gemini" : "AI से बना विजुअल नमूना · Google Gemini"}</p>
               </article>
             ))}
           </div>
