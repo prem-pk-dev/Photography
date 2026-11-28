@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Aperture, ArrowLeft, ArrowRight, Camera, Clapperboard, Film, Image, LockKeyhole, ShieldCheck, WandSparkles, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 import { categories, projects } from "./data";
-import { applySeoMetadata } from "./seo";
+import { applySeoMetadata, getBookingUnavailableCopy } from "./seo";
 
 const nav = [
   ["Home", "/"], ["Portfolio", "/portfolio"], ["Services", "/services"],
@@ -36,7 +36,8 @@ function SiteFrame({ title, eyebrow, children }: { title: string; eyebrow: strin
     "WHAT WE CREATE": "हम क्या बनाते हैं",
     "A MOVING PICTURE": "चलती तस्वीरों की कहानी",
     "LET'S MAKE SOMETHING MEANINGFUL": "आइए कुछ यादगार बनाएँ",
-    "SELECTED STORIES": "चुनी हुई कहानियाँ"
+    "SELECTED STORIES": "चुनी हुई कहानियाँ",
+    "CUSTOMER BOOKING": "ग्राहक बुकिंग"
   } as Record<string, string>)[eyebrow] || eyebrow : eyebrow;
   return <div className="site-shell">
     <header className="site-header">
@@ -1273,6 +1274,8 @@ const bookingServices = [
 ] as const;
 
 function CustomerBookingPage() {
+  const language = getSiteLanguage();
+  const unavailableCopy = getBookingUnavailableCopy(language);
   const [mode,setMode] = useState<"login"|"register">("register");
   const [customer,setCustomer] = useState<{full_name:string;email:string}|null>(null);
   const [name,setName] = useState("");
@@ -1317,10 +1320,10 @@ function CustomerBookingPage() {
     finally{setBusy(false);}
   };
   const logout=async()=>{await fetch("/api/customer/logout",{method:"POST",credentials:"same-origin"});setCustomer(null);setBookings([]);};
-  if(!readinessChecked) return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Booking availability"><p className="section-subtitle">Checking booking service availability…</p></SiteFrame>;
-  if(!serviceReady) return <SiteFrame eyebrow="CUSTOMER BOOKING" title="Booking temporarily unavailable">
+  if(!readinessChecked) return <SiteFrame eyebrow={language === "hi" ? "CUSTOMER BOOKING" : "CUSTOMER BOOKING"} title={language === "hi" ? "बुकिंग की उपलब्धता" : "Booking availability"}><p className="section-subtitle">{language === "hi" ? "बुकिंग सेवा की उपलब्धता जाँची जा रही है…" : "Checking booking service availability…"}</p></SiteFrame>;
+  if(!serviceReady) return <SiteFrame eyebrow={unavailableCopy.eyebrow} title={unavailableCopy.title}>
     <div className="service-card" style={{maxWidth:720}}>
-      <p className="section-subtitle">Online booking is temporarily unavailable while the booking service is being prepared. No account or booking request has been submitted. Please contact Golden Films directly to discuss availability.</p>
+      <p className="section-subtitle">{unavailableCopy.description}</p>
       <div className="contact-methods" style={{marginTop:24}}>
         <a href="https://wa.me/918949800427" target="_blank" rel="noreferrer">WhatsApp · +91 89498 00427</a>
         <a href="tel:+918949800427">Call +91 89498 00427</a>
