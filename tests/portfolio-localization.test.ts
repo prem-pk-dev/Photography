@@ -56,21 +56,16 @@ test("about fallback is a factual bilingual Golden Films studio biography", () =
   assert.match(about, /not verified client work/);
 });
 
-test("showreel uses the four rights-verified MEDIA-ASSETS photography videos", () => {
+test("showreel plays one registered rights-verified MEDIA-ASSETS video with clear AI disclosure", () => {
   const showreel = pages.slice(pages.indexOf("function ShowreelContentPage"), pages.indexOf("function ContactContentPage"));
-  const videos = [
-    "photography-cinematic-showcase.mp4",
-    "photography-visual-story.mp4",
-    "photography-gemini-motion-01.mp4",
-    "photography-gemini-motion-02.mp4"
-  ];
-  for (const video of videos) {
-    assert.ok(showreel.includes("https://media-assets-4sb.pages.dev/videos/photography/" + video), "missing registered video: " + video);
-  }
-  assert.match(showreel, /Four cinematic video clips/);
-  assert.match(showreel, /AI-generated samples, not evidence of client shoots/);
-  assert.match(showreel, /ये AI-generated नमूना क्लिप केवल प्रेरणा के लिए हैं/);
-  assert.match(showreel, /An approved client showreel will be featured separately when available/);
-  assert.doesNotMatch(showreel, /शो-रील खाली रहेगी|showreel slot remains empty/);
+  const videoUrl = "https://media-assets-4sb.pages.dev/videos/photography/photography-cinematic-showcase.mp4";
+  assert.ok(showreel.includes(videoUrl), "missing selected registered video");
+  assert.equal((showreel.match(/\.mp4/g) || []).length, 1, "showreel should contain exactly one MP4");
+  assert.match(showreel, /One cinematic video clip/);
+  assert.match(showreel, /controls preload="metadata" playsInline/);
+  assert.match(showreel, /AI-generated Google Gemini demo/);
+  assert.match(showreel, /AI-generated नमूना वीडियो/);
+  assert.match(showreel, /वास्तविक क्लाइंट प्रोजेक्ट या शूट किया गया असाइनमेंट नहीं/);
+  assert.doesNotMatch(showreel, /autoplay|photography-visual-story\.mp4|photography-gemini-motion-0[12]\.mp4/);
   assert.doesNotMatch(showreel, /videos\.pexels\.com/);
 });
