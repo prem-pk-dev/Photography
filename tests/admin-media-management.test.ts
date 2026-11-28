@@ -26,12 +26,8 @@ function authenticatedDb(role: "owner" | "editor" = "editor") {
           if (query.includes("JOIN admin_users u ON u.id = s.admin_user_id")) {
             return { id: "admin-1", email: "editor@example.test", role } as T;
           }
-          if (query.includes("SELECT id FROM project_media")) {
-            return { id: "media-1" } as T;
-          }
-          if (query.includes("SELECT id FROM projects")) {
-            return { id: "project-1" } as T;
-          }
+          if (query.includes("SELECT id FROM project_media")) return { id: "media-1" } as T;
+          if (query.includes("SELECT id FROM projects")) return { id: "project-1" } as T;
           return null as T | null;
         },
         async run() {
@@ -106,7 +102,6 @@ test("authenticated editor can add a safe external media URL as a private draft"
     "project-1",
     "image",
     "https://cdn.example.test/portfolio/wedding.jpg",
-    null,
     "Wedding portrait",
     "विवाह चित्र",
     4,
