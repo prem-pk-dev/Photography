@@ -38,3 +38,14 @@ test("private and unknown routes are excluded from indexing", () => {
     assert.equal(getSeoMetadata(route).robots, "noindex,nofollow", route);
   }
 });
+
+test("booking unavailable page copy is localized in English and Hindi", async () => {
+  const { getBookingUnavailableCopy } = await import("../src/seo.ts");
+  const english = getBookingUnavailableCopy("en");
+  assert.equal(english.title, "Booking temporarily unavailable");
+  assert.match(english.description, /Online booking is temporarily unavailable/);
+  const hindi = getBookingUnavailableCopy("hi");
+  assert.equal(hindi.title, "ऑनलाइन बुकिंग फिलहाल उपलब्ध नहीं");
+  assert.match(hindi.description, /बुकिंग सेवा तैयार होने तक ऑनलाइन बुकिंग/);
+  assert.match(hindi.description, /कोई खाता या बुकिंग अनुरोध सबमिट नहीं किया गया है/);
+});
