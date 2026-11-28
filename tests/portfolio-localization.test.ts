@@ -62,6 +62,9 @@ test("showreel plays one registered rights-verified MEDIA-ASSETS video with clea
   assert.ok(showreel.includes(videoUrl), "missing selected registered video");
   assert.equal((showreel.match(/\.mp4/g) || []).length, 1, "showreel should contain exactly one MP4");
   assert.match(showreel, /One cinematic video clip/);
+  assert.match(showreel, /This is one registered AI-generated sample video from MEDIA-ASSETS/);
+  assert.match(showreel, /This video loads from the MEDIA-ASSETS public CDN/);
+  assert.doesNotMatch(showreel, /These are registered AI-generated sample videos|Videos load from the MEDIA-ASSETS public CDN/);
   assert.match(showreel, /controls preload="metadata" playsInline/);
   assert.match(showreel, /AI-generated Google Gemini demo/);
   assert.match(showreel, /AI-generated नमूना वीडियो/);
