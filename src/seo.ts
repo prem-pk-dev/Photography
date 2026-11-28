@@ -41,6 +41,20 @@ const pageCopy: Record<string, { en: [string, string]; hi: [string, string] }> =
   }
 };
 
+export function getBookingUnavailableCopy(language: SiteLanguage): { eyebrow: string; title: string; description: string } {
+  return language === "hi"
+    ? {
+        eyebrow: "CUSTOMER BOOKING",
+        title: "ऑनलाइन बुकिंग फिलहाल उपलब्ध नहीं",
+        description: "बुकिंग सेवा तैयार होने तक ऑनलाइन बुकिंग अस्थायी रूप से उपलब्ध नहीं है। कोई खाता या बुकिंग अनुरोध सबमिट नहीं किया गया है। उपलब्धता जानने के लिए कृपया सीधे Golden Films से संपर्क करें।"
+      }
+    : {
+        eyebrow: "CUSTOMER BOOKING",
+        title: "Booking temporarily unavailable",
+        description: "Online booking is temporarily unavailable while the booking service is being prepared. No account or booking request has been submitted. Please contact Golden Films directly to discuss availability."
+      };
+}
+
 const privateRoutes = new Set(["/book", "/admin", "/login", "/register", "/admin.html", "/login.html", "/register.html"]);
 
 export function getSeoMetadata(pathname: string, language: SiteLanguage = "en"): SeoMetadata {
