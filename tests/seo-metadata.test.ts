@@ -45,6 +45,7 @@ test("booking unavailable page copy is localized in English and Hindi", async ()
   assert.equal(english.title, "Booking temporarily unavailable");
   assert.match(english.description, /Online booking is temporarily unavailable/);
   const hindi = getBookingUnavailableCopy("hi");
+  assert.equal(hindi.eyebrow, "ग्राहक बुकिंग");
   assert.equal(hindi.title, "ऑनलाइन बुकिंग फिलहाल उपलब्ध नहीं");
   assert.match(hindi.description, /बुकिंग सेवा तैयार होने तक ऑनलाइन बुकिंग/);
   assert.match(hindi.description, /कोई खाता या बुकिंग अनुरोध सबमिट नहीं किया गया है/);
