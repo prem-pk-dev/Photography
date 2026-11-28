@@ -34,6 +34,10 @@ const pageCopy: Record<string, { en: [string, string]; hi: [string, string] }> =
   "/contact": {
     en: ["Contact Golden Films", "Get in touch with Golden Films about photography, videography, editing and creative projects. Contact details shown on this preview are temporary."],
     hi: ["Golden Films से संपर्क करें", "फोटोग्राफी, वीडियोग्राफी, एडिटिंग और क्रिएटिव प्रोजेक्ट के लिए Golden Films से संपर्क करें। इस प्रीव्यू पर दिखाई गई संपर्क जानकारी अस्थायी है।"]
+  },
+  "/book": {
+    en: ["Booking temporarily unavailable — Golden Films", "Online booking is temporarily unavailable while the booking service is being prepared. Contact Golden Films directly to discuss availability."],
+    hi: ["ऑनलाइन बुकिंग फिलहाल उपलब्ध नहीं — Golden Films", "बुकिंग सेवा तैयार होने तक ऑनलाइन बुकिंग अस्थायी रूप से उपलब्ध नहीं है। उपलब्धता जानने के लिए सीधे Golden Films से संपर्क करें।"]
   }
 };
 
